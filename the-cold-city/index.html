@@ -1,0 +1,1437 @@
+<title>THE COLD CITY — a pilgrimage combat slice</title>
+<style>
+  :root{
+    --bg:#0e0716; --panel:#160d24; --edge:rgba(84,219,214,.14);
+    --ink:#cbb9dc; --dim:rgba(203,185,220,.55); --faint:rgba(203,185,220,.3);
+    --cyan:#54dbd6; --magenta:#ff5c9a; --gold:#f0c987;
+    --green:#6fd47a; --purple:#a86ede; --danger:#ff5c6a;
+  }
+  *{box-sizing:border-box}
+  .wrap{
+    max-width:960px; margin:0 auto; padding:20px 16px 40px;
+    font-family:ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+    color:var(--ink);
+    background:radial-gradient(120% 90% at 50% -10%, #1a0f2b 0%, #0e0716 55%, #080410 100%);
+    min-height:100vh;
+  }
+  .titlebar{display:flex;justify-content:space-between;align-items:flex-end;
+    gap:12px;flex-wrap:wrap;margin-bottom:10px}
+  .titlebar h1{font-size:13px;font-weight:600;letter-spacing:.22em;margin:0;
+    text-transform:uppercase}
+  .titlebar .sub{font-size:10px;letter-spacing:.16em;color:var(--faint);
+    text-transform:uppercase;margin-top:4px}
+  .titlebar .credo{font-size:10px;letter-spacing:.14em;color:var(--dim);
+    text-transform:uppercase;text-align:right;max-width:270px;line-height:1.5}
+
+  .stage{position:relative;width:100%;aspect-ratio:320/180;
+    border:1px solid var(--edge);background:#080410;overflow:hidden;
+    box-shadow:0 0 0 1px rgba(0,0,0,.6),0 24px 60px -30px rgba(0,0,0,.9)}
+  canvas{position:absolute;inset:0;width:100%;height:100%;display:block;
+    image-rendering:pixelated;image-rendering:crisp-edges}
+
+  .hud{position:absolute;inset:0;pointer-events:none;
+    font-size:10px;letter-spacing:.14em;text-transform:uppercase}
+  .hud .tl{position:absolute;top:7px;left:9px;color:var(--faint);line-height:1.6}
+  .hud .tl b{color:var(--dim);font-weight:600}
+  .hud .tr{position:absolute;top:7px;right:9px;text-align:right;line-height:1.6}
+  .bars{display:flex;gap:2px;justify-content:flex-end;margin-top:3px}
+  .pip{width:8px;height:5px;background:var(--cyan);box-shadow:0 0 4px var(--cyan)}
+  .pip.off{background:rgba(203,185,220,.15);box-shadow:none}
+  .pip.mp{background:var(--purple);box-shadow:0 0 4px var(--purple)}
+  .hud .math{position:absolute;bottom:7px;left:9px;color:var(--faint);
+    font-size:9px;line-height:1.6;max-width:66%;letter-spacing:.1em}
+  .hud .math b{color:var(--gold);font-weight:600}
+  .hud .phase{position:absolute;bottom:7px;right:9px;color:var(--cyan);font-size:10px}
+  .hud .phase.enemy{color:var(--magenta)}
+
+  /* speech bubbles — anchored to the thing they describe */
+  .bubble{position:absolute;transform:translate(-50%,-100%);
+    background:#f4eefb;color:#1b1430;border:2px solid #1b1430;
+    padding:5px 8px;font-size:10px;line-height:1.35;letter-spacing:.04em;
+    max-width:170px;text-transform:uppercase;font-weight:700;
+    pointer-events:none;z-index:5;animation:pop .18s ease-out}
+  .bubble:after{content:"";position:absolute;bottom:-8px;left:50%;
+    margin-left:-5px;width:0;height:0;border:5px solid transparent;
+    border-top-color:#1b1430}
+  .bubble .go{display:block;margin-top:3px;color:#7a3f9e;font-size:8.5px;
+    letter-spacing:.12em}
+  @keyframes pop{from{transform:translate(-50%,-92%) scale(.9);opacity:0}}
+  @media(prefers-reduced-motion:reduce){.bubble{animation:none}}
+
+  /* overlays */
+  .curtain{position:absolute;inset:0;display:none;place-items:center;text-align:center;
+    background:rgba(8,4,16,.82);backdrop-filter:blur(2px);pointer-events:auto;z-index:10;
+    padding:14px;overflow:auto}
+  .curtain.show{display:grid}
+  .poem{font-size:12px;letter-spacing:.18em;line-height:1.8;text-transform:uppercase;
+    max-width:80%;margin:0 auto;color:var(--ink)}
+  .curtain.win .poem{color:var(--gold)}
+  .again{margin-top:14px;font-size:9.5px;letter-spacing:.2em;color:var(--faint);
+    text-transform:uppercase}
+
+  /* skill draft */
+  .draftTitle{font-size:11px;letter-spacing:.24em;text-transform:uppercase;
+    color:var(--gold);margin-bottom:3px}
+  .draftSub{font-size:9px;letter-spacing:.14em;color:var(--faint);
+    text-transform:uppercase;margin-bottom:12px}
+  .cards{display:flex;gap:9px;justify-content:center;flex-wrap:wrap}
+  .card{width:150px;background:var(--panel);border:1px solid var(--edge);
+    padding:10px;text-align:left;cursor:pointer;transition:border-color .15s,transform .15s;
+    font-family:inherit;color:var(--ink)}
+  .card:hover,.card:focus-visible{border-color:var(--cyan);transform:translateY(-2px);outline:none}
+  .card .cat{font-size:8px;letter-spacing:.2em;text-transform:uppercase;color:var(--faint)}
+  .card .nm{font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--gold);margin:4px 0 5px;font-weight:600}
+  .card .ds{font-size:9.5px;line-height:1.5;color:var(--dim);text-transform:none;
+    letter-spacing:.02em}
+  .card .tag{display:inline-block;margin-top:6px;font-size:8px;letter-spacing:.14em;
+    padding:2px 5px;border:1px solid var(--edge);color:var(--faint);text-transform:uppercase}
+  .card .tag.act{color:var(--purple);border-color:rgba(168,110,222,.4)}
+
+  .bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+  button{font-family:inherit;font-size:10px;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--ink);background:var(--panel);border:1px solid var(--edge);
+    padding:9px 13px;cursor:pointer;transition:border-color .15s,color .15s,background .15s}
+  button:hover:not(:disabled){border-color:var(--cyan);color:#fff}
+  button:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+  button:disabled{opacity:.3;cursor:not-allowed}
+  .spacer{flex:1}
+
+  /* the game is waiting on you: an attack offer announces itself */
+  .strikeRow{display:flex;gap:8px}
+  button.strike{color:#fff;border-color:rgba(255,92,106,.65);
+    background:linear-gradient(180deg,rgba(255,92,106,.22),rgba(255,92,106,.08));
+    animation:await 1.15s ease-in-out infinite}
+  button.strike:hover{background:rgba(255,92,106,.3);border-color:var(--danger)}
+  @keyframes await{
+    0%,100%{box-shadow:0 0 0 0 rgba(255,92,106,.45)}
+    50%    {box-shadow:0 0 0 5px rgba(255,92,106,0)}
+  }
+  @media(prefers-reduced-motion:reduce){
+    button.strike{animation:none;box-shadow:0 0 0 2px rgba(255,92,106,.4)}
+  }
+
+  .lower{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+  @media(max-width:700px){.lower{grid-template-columns:1fr}}
+  .card2{border:1px solid var(--edge);background:rgba(22,13,36,.5);padding:11px 13px}
+  .card2 h2{font-size:8.5px;letter-spacing:.24em;text-transform:uppercase;
+    color:var(--faint);margin:0 0 8px;font-weight:600}
+  .log{font-size:10.5px;line-height:1.7;color:var(--dim);min-height:112px;
+    display:flex;flex-direction:column;justify-content:flex-end;gap:1px}
+  .log .now{color:var(--ink)}
+
+  .slots{display:flex;flex-direction:column;gap:5px;min-height:112px}
+  .slot{display:flex;align-items:center;gap:7px;font-size:9.5px;letter-spacing:.06em;
+    padding:5px 7px;border:1px solid rgba(84,219,214,.1);background:rgba(84,219,214,.03)}
+  .slot .dot{width:6px;height:6px;flex:none;background:var(--cyan)}
+  .slot .dot.act{background:var(--purple)}
+  .slot .nm{color:var(--ink);text-transform:uppercase;letter-spacing:.1em;font-size:9px}
+  .slot .ds{color:var(--faint);text-transform:none;font-size:9px}
+  .slot.empty{color:var(--faint);border-style:dashed;opacity:.5;text-transform:uppercase;
+    letter-spacing:.14em;font-size:8.5px;justify-content:center}
+  .slot button{padding:3px 7px;font-size:8px;letter-spacing:.1em;margin-left:auto}
+
+  details{margin-top:12px;border:1px solid var(--edge);background:rgba(22,13,36,.4)}
+  summary{cursor:pointer;font-size:10px;letter-spacing:.18em;text-transform:uppercase;
+    color:var(--faint);padding:10px 13px;list-style:none}
+  summary::-webkit-details-marker{display:none}
+  summary:before{content:"› ";color:var(--cyan)}
+  details[open] summary:before{content:"⌄ "}
+  .rules{padding:0 15px 15px;font-size:10.5px;line-height:1.8;color:var(--dim)}
+  .rules b{color:var(--ink)} .rules .k{color:var(--cyan)} .rules .h{color:var(--magenta)}
+  .rules code{background:rgba(84,219,214,.07);padding:1px 5px;color:var(--gold);
+    font-size:10px;border:1px solid rgba(84,219,214,.12)}
+  .rules table{width:100%;border-collapse:collapse;margin:8px 0;font-size:9.5px}
+  .rules td,.rules th{border:1px solid var(--edge);padding:4px 7px;text-align:left}
+  .rules th{color:var(--faint);text-transform:uppercase;letter-spacing:.12em;font-size:8.5px}
+  .scroll{overflow-x:auto}
+</style>
+
+<div class="wrap">
+  <div class="titlebar">
+    <div>
+      <h1>The Cold City</h1>
+      <div class="sub" id="floorLabel">Tutorial · a pilgrimage combat slice</div>
+    </div>
+    <div class="credo">A small silhouette against a monumental world — you cross it anyway.</div>
+  </div>
+
+  <div class="stage" id="stage">
+    <canvas id="cv" width="320" height="180"></canvas>
+    <div class="hud">
+      <div class="tl">
+        <div><b id="hRound">ROUND 1</b></div>
+        <div id="hFoes">FOES · 1</div>
+      </div>
+      <div class="tr">
+        <div>THE PILGRIM</div>
+        <div class="bars" id="hHp"></div>
+        <div class="bars" id="hMp" title="Magic — spent by spells"></div>
+        <div id="hBuff" style="color:var(--gold);font-size:9px;margin-top:3px"></div>
+      </div>
+      <div class="math" id="hMath"></div>
+      <div class="phase" id="hPhase">YOUR TURN</div>
+    </div>
+    <div id="bubbles"></div>
+
+    <div class="curtain" id="draft">
+      <div>
+        <div class="draftTitle" id="draftTitle">FLOOR CLEARED — CHOOSE A SKILL</div>
+        <div class="draftSub" id="draftSub">One of three. You may carry five.</div>
+        <div class="cards" id="cards"></div>
+      </div>
+    </div>
+
+    <div class="curtain" id="curtain">
+      <div>
+        <div class="poem" id="poem"></div>
+        <div class="again" id="againTxt">CLICK OR PRESS R TO WALK AGAIN</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bar">
+    <span id="strikeBtns" class="strikeRow"></span>
+    <button id="btnEnd">End Turn ␣</button>
+    <button id="btnBolt" title="Magic strike">Arcane Bolt</button>
+    <button id="btnAct1">—</button>
+    <button id="btnAct2">—</button>
+    <div class="spacer"></div>
+    <button id="btnRestart">Restart Run</button>
+  </div>
+
+  <div class="lower">
+    <div class="card2">
+      <h2>The Record</h2>
+      <div class="log" id="log"></div>
+    </div>
+    <div class="card2">
+      <h2>Skills <span style="color:var(--faint)" id="slotCount">0/5</span></h2>
+      <div class="slots" id="slots"></div>
+    </div>
+  </div>
+
+  <details>
+    <summary>Rules, stats &amp; the damage formula</summary>
+    <div class="rules">
+      <b>Base stats</b> — basic damage <code>4</code> · basic defense <code>1</code> ·
+      HP <code>10</code> · MP <code>4</code> · move <code>1</code> · attack distance <code>1</code>.<br><br>
+      <b>Damage formula</b><br>
+      <code>damage = ⌊ max(0, (basic + extra) × hits − defense) × amp × (1 + vulnerability) ⌋</code><br>
+      Rounded down, never below 0. Defense is subtracted <b>once per attack, not per hit</b> —
+      so extra hits multiply every flat bonus and cut through armor.
+      <b>Amp</b> (e.g. Madness ×1.5) and <b>vulnerability</b> (the target's taken-damage modifier)
+      multiply together.<br><br>
+      <b>Damage types</b> — <span class="k">Physical</span>: normal.
+      <span class="k">Magic</span>: ignores <b>50% of defense</b> (the answer to armor).
+      <span class="k">Ranged</span> needs a long-range weapon (Bow / Staff);
+      <span class="k">Melee</span> is distance 1.<br><br>
+      <b>MP (the purple bar)</b> — magic. You start with <code>4</code> and it
+      <b>refills at the start of every floor</b>. Only spells spend it:
+      <b>Arcane Bolt</b> costs 2, <b>Healing</b> costs 3, and a <b>Magic Staff</b>
+      makes every spell cost 1 less. Until you draft a spell, MP simply sits full —
+      nothing else uses it.<br><br>
+      <b>Skills</b> — clear a floor, choose <b>1 of 3</b>. You may carry <b>5</b>;
+      at five you must replace one. Most are <b>passive</b> (permanent); a few are
+      <span style="color:var(--purple)">active</span> with limited uses per battle.<br><br>
+      <b>The enemies</b><br>
+      <span class="h">Grunt</span> — melee. Takes the closest path to you, strikes when adjacent.<br>
+      <span class="h">Archer</span> — ranged. Kites away and fires when you are outside its 5×5 watch with a clear line. Walls block it.<br>
+      <span class="h">Mage</span> — magic artillery. Shells the tile where you last stood; its damage ignores half your defense. <b>Step each turn to dodge it.</b><br>
+      <span class="h">Warden</span> (boss) — heavy armor (defense 3). Physical blows glance off; <b>magic and multi-hit</b> are the answers.<br><br>
+      <b>Controls</b> — click a tile to step, click a foe to strike ·
+      <span class="k">WASD/Arrows</span> step · <span class="k">Space</span> end turn ·
+      <span class="k">R</span> restart.
+    </div>
+  </details>
+</div>
+
+<script>
+(() => {
+"use strict";
+const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
+ctx.imageSmoothingEnabled=false;
+const W=320,H=180;
+
+/* ============================ BOARD ============================ */
+const COLS=12, ROWS=6, TILE=22;
+const BX=Math.floor((W-COLS*TILE)/2), BY=44;
+const tileX=c=>BX+c*TILE, tileY=r=>BY+r*TILE;
+const cx=c=>tileX(c)+TILE/2, cyr=r=>tileY(r)+TILE/2;
+const inB=(c,r)=>c>=0&&c<COLS&&r>=0&&r<ROWS;
+const key=(c,r)=>c+','+r;
+const cheb=(a,b)=>Math.max(Math.abs(a.col-b.col),Math.abs(a.row-b.row));
+const manh=(a,b)=>Math.abs(a.col-b.col)+Math.abs(a.row-b.row);
+const N4=[[1,0],[-1,0],[0,1],[0,-1]];
+
+/* ============================ BASE STATS ============================ */
+const BASE={ dmg:4, def:1, hp:10, mp:4, move:1, range:1 };
+
+/* ============================ SKILLS ============================
+   mod fields: extra(+flat dmg) hits(+attacks) halve(basic/2) def(+defense)
+               hp(+max HP) mp(+max MP) range(+distance) mpCut(cost -1)
+   kind: 'passive' | 'active'                                        */
+const SKILLS={
+  power_strike:{cat:'ATTACK',name:'Power Strike',kind:'passive',
+    ds:'+2 damage on every strike.',mod:{extra:2}},
+  quick_attack:{cat:'ATTACK',name:'Quick Attack',kind:'passive',
+    ds:'Act first: take one extra turn at the start of each battle.',flag:'initiative'},
+  double_slash:{cat:'ATTACK',name:'Double Slash',kind:'passive',
+    ds:'Strike twice, but basic damage is halved. Multiplies every flat bonus.',
+    mod:{hits:1,halve:true}},
+
+  shield_block:{cat:'DEFEND',name:'Shield Block',kind:'passive',
+    ds:'Incoming damage reduced by 2 (defense +2).',mod:{def:2}},
+  dodge:{cat:'DEFEND',name:'Dodge',kind:'active',uses:1,
+    ds:'Ignore the next attack that would hit you.'},
+  magic_barrier:{cat:'DEFEND',name:'Magic Barrier',kind:'active',uses:1,
+    ds:'Rebound the next magic attack back at its caster.'},
+
+  second_wind:{cat:'HEALING',name:'Second Wind',kind:'active',uses:1,
+    ds:'Regenerate 2 HP at the start of each of your next 5 rounds.'},
+  healing:{cat:'HEALING',name:'Healing',kind:'active',uses:1,mp:3,
+    ds:'Recover all HP. Costs 3 MP.'},
+
+  iron_sword:{cat:'GEAR',name:'Iron Sword',kind:'passive',
+    ds:'+1 strike per attack, but basic damage is halved.',mod:{hits:1,halve:true}},
+  bow:{cat:'GEAR',name:'Bow',kind:'passive',
+    ds:'Attack distance +2. Lets you deal ranged damage.',mod:{range:2},grants:'ranged'},
+  magic_staff:{cat:'GEAR',name:'Magic Staff',kind:'passive',
+    ds:'Attack distance +1 and all MP costs reduced by 1.',mod:{range:1,mpCut:1},grants:'ranged'},
+  armor:{cat:'GEAR',name:'Armor',kind:'passive',
+    ds:'Incoming damage reduced by 1 (defense +1).',mod:{def:1}},
+  knight_armor:{cat:'GEAR',name:'Knight Armor',kind:'passive',
+    ds:'Maximum HP +2.',mod:{hp:2}},
+
+  arcane_bolt:{cat:'MAGIC',name:'Arcane Bolt',kind:'active',uses:3,mp:2,
+    ds:'Magic strike at distance 2 — ignores half the target’s defense. 2 MP.'},
+  magic_heart:{cat:'MAGIC',name:'Magic Heart',kind:'passive',
+    ds:'Maximum MP +1.',mod:{mp:1}},
+  vitality:{cat:'MAGIC',name:'Essence of Vitality',kind:'passive',
+    ds:'Maximum HP +2 and heal 2 now.',mod:{hp:2}},
+  whetstone:{cat:'GEAR',name:'Whetstone',kind:'passive',
+    ds:'+1 damage on every strike.',mod:{extra:1}},
+};
+const SKILL_IDS=Object.keys(SKILLS);
+
+/* ============================ ENEMIES ============================ */
+const KINDS={
+  grunt :{name:'Grunt', hp:7, bd:3, def:1, range:1, move:1, dtype:'physical', ai:'chase'},
+  archer:{name:'Archer',hp:5, bd:4, def:0, range:9, move:1, dtype:'physical', ai:'kite'},
+  mage  :{name:'Mage',  hp:5, bd:4, def:0, range:9, move:0, dtype:'magic',    ai:'shell'},
+  warden:{name:'Warden',hp:18,bd:5, def:3, range:1, move:1, dtype:'physical', ai:'chase',boss:true},
+};
+
+/* ============================ FLOORS ============================
+   One new enemy type per floor; combinations only reuse known types. */
+const FLOORS=[
+ {name:'TUTORIAL', tutorial:true,       // a teaching grunt: 2 hits to fell, hits softly
+  enemies:[['grunt',7,3,{hp:6,bd:2}]], walls:[[5,1],[5,2],[9,2]],
+  shrines:[[3,3]]},                    // sits on the approach, so it gets taught
+ {name:'FLOOR 1',
+  enemies:[['grunt',7,2],['grunt',8,4]], walls:[[5,1],[5,2],[6,4],[9,2]], shrines:[[3,5]]},
+ {name:'FLOOR 2', intro:'archer',   // a teaching archer: it stings, it doesn't execute
+  enemies:[['archer',10,3,{hp:4,bd:3}]], walls:[[4,3],[4,2],[6,4],[7,1],[7,2],[9,4]],
+  shrines:[[2,1]]},
+ {name:'FLOOR 3',
+  enemies:[['grunt',6,1],['archer',10,4]], walls:[[5,2],[6,4],[8,1],[9,2]], shrines:[[3,5],[8,5]]},
+ {name:'FLOOR 4', intro:'mage',
+  enemies:[['mage',10,1]], walls:[[5,1],[5,2],[6,2],[6,4],[8,4],[9,2]], shrines:[[2,5]]},
+ {name:'FLOOR 5',
+  enemies:[['grunt',6,4],['archer',11,2],['mage',10,0]],
+  walls:[[5,1],[5,2],[6,4],[8,1],[8,4],[9,2]], shrines:[[2,1],[3,5]]},
+ {name:'FLOOR 6 — THE WARDEN', boss:true, intro:'warden',
+  enemies:[['warden',9,3],['grunt',7,1]], walls:[[5,1],[5,4],[8,2],[8,4]], shrines:[[2,3]]},
+];
+
+/* ============================ STATE ============================ */
+let S=null, effects=[], particles=[], hover=null, raf=0, tut=null;
+
+function newRun(){
+  return { floor:0,
+    hero:{ hp:BASE.hp, mp:BASE.mp, col:1, row:3, skills:[], regen:0, buffs:{},
+           dodge:false, barrier:false, uses:{}, startCol:1, startRow:3,
+           moved:false, struck:false, extraTurn:false, anim:null },
+    log:[], round:1, phase:'player', over:null,
+    enemies:[], walls:new Set(), shrines:new Set(),
+    reach:new Map(), attackable:new Set(), gen:0 };
+}
+
+/* --------- derived hero stats (base + skill mods) --------- */
+function mods(){
+  const m={extra:0,hits:1,halve:false,def:0,hp:0,mp:0,range:0,mpCut:0};
+  for(const id of S.hero.skills){
+    const k=SKILLS[id]; if(!k||!k.mod) continue;
+    const d=k.mod;
+    if(d.extra) m.extra+=d.extra;
+    if(d.hits)  m.hits +=d.hits;
+    if(d.halve) m.halve=true;           // halving applies once, never compounds
+    if(d.def)   m.def  +=d.def;
+    if(d.hp)    m.hp   +=d.hp;
+    if(d.mp)    m.mp   +=d.mp;
+    if(d.range) m.range+=d.range;
+    if(d.mpCut) m.mpCut+=d.mpCut;
+  }
+  return m;
+}
+const maxHp   = ()=>BASE.hp + mods().hp;
+const maxMp   = ()=>BASE.mp + mods().mp;
+const heroDef = ()=>BASE.def + mods().def;
+const heroRange=()=>BASE.range + mods().range;
+const has     = id=>S.hero.skills.includes(id);
+function mpCost(base){ return Math.max(0, base - mods().mpCut); }
+
+/* --------- THE DAMAGE FORMULA ---------
+   ⌊ max(0,(basic+extra)*hits − def) * amp * (1+vulnerability) ⌋   */
+function calcDamage({basic,extra=0,hits=1,def=0,type='physical',amp=1,vuln=0}){
+  const b = basic/1;
+  let d = def;
+  if(type==='magic') d = d*0.5;                 // magic ignores 50% defense
+  let raw = (b+extra)*hits - d;
+  if(raw<0) raw=0;
+  raw = raw * amp * (1+vuln);
+  return Math.max(0, Math.floor(raw));
+}
+/* the pilgrim's current attack profile */
+function heroProfile(type){
+  const m=mods();
+  const magic = type==='magic';
+  return { basic: m.halve? BASE.dmg/2 : BASE.dmg,
+           extra: m.extra + (S.hero.buffs.fire?2:0) + (S.hero.buffs.endless?2:0),
+           hits : magic? 1 : m.hits,      // bolts are a single magic hit
+           amp  : S.hero.buffs.madness?1.5:1,
+           type : magic?'magic':'physical' };
+}
+function heroDamageTo(e,type){
+  const p=heroProfile(type);
+  return calcDamage({...p, def:e.def, vuln:e.vuln||0});
+}
+
+/* ============================ FLOOR SETUP ============================ */
+function loadFloor(i){
+  const F=FLOORS[i];
+  S.floor=i; S.round=1; S.phase='player'; S.over=null;
+  S.walls=new Set(F.walls.map(([c,r])=>key(c,r)));
+  S.shrines=new Set((F.shrines||[]).map(([c,r])=>key(c,r)));
+  S.enemies=F.enemies.map(([kind,c,r,over],n)=>{
+    const K={...KINDS[kind],...(over||{})};      // per-floor stat overrides
+    return {kind,name:K.name,col:c,row:r,hp:K.hp,maxHp:K.hp,bd:K.bd,def:K.def,
+            range:K.range,move:K.move,dtype:K.dtype,ai:K.ai,boss:!!K.boss,
+            alive:true,poison:0,vuln:0,anim:null,flash:0,n};
+  });
+  const h=S.hero;
+  S.gen++;                                      // invalidate any in-flight turn
+  h.col=1; h.row=3; h.vx=1; h.vy=3;             // don't slide in from the last floor
+  h.moved=false; h.struck=false;
+  h.mp=maxMp(); h.hp=Math.min(h.hp,maxHp());
+  h.dodge=false; h.barrier=false; h.regen=0; h.buffs={}; h.uses={};
+  h.extraTurn=has('quick_attack');
+  effects=[];
+  document.getElementById('floorLabel').textContent =
+    F.name+' · '+(F.boss?'the warden waits':'a pilgrimage combat slice');
+  say(F.tutorial? 'you enter the district. the city hums, indifferent.'
+                : `${F.name.toLowerCase()} — the light shifts.`);
+  if(F.intro) say(introLine(F.intro));
+  tut = F.tutorial ? {step:0} : null;
+  beginPlayerTurn();
+  renderSlots(); updateHud();
+}
+function introLine(k){
+  return { archer:'an archer holds the far side. it will keep its distance.',
+           mage:'a mage. its shells fall where you last stood — keep moving.',
+           warden:'the warden. armour thick enough to turn a blade.' }[k]||'';
+}
+
+/* ============================ OCCUPANCY / GEOMETRY ============================ */
+const isWall=(c,r)=>S.walls.has(key(c,r));
+function enemyAt(c,r){ return S.enemies.find(e=>e.alive&&e.col===c&&e.row===r)||null; }
+function occupied(c,r,ig){
+  if(S.hero.hp>0 && S.hero!==ig && S.hero.col===c && S.hero.row===r) return true;
+  return S.enemies.some(e=>e!==ig&&e.alive&&e.col===c&&e.row===r);
+}
+const passable=(c,r,ig)=>inB(c,r)&&!isWall(c,r)&&!occupied(c,r,ig);
+
+function losClear(a,b){
+  let x=a.col,y=a.row; const x1=b.col,y1=b.row;
+  const dx=Math.abs(x1-x),dy=Math.abs(y1-y);
+  const sx=x<x1?1:-1, sy=y<y1?1:-1; let err=dx-dy;
+  while(!(x===x1&&y===y1)){
+    const e2=2*err;
+    if(e2>-dy){err-=dy;x+=sx;}
+    if(e2<dx){err+=dx;y+=sy;}
+    if(x===x1&&y===y1) break;
+    if(isWall(x,y)) return false;
+  }
+  return true;
+}
+function computeReach(){
+  const h=S.hero, budget=(h.moved?0:BASE.move+(h.buffs.wind?1:0));
+  const reach=new Map();
+  if(budget>0){
+    const dist=new Map([[key(h.col,h.row),0]]); const q=[[h.col,h.row]];
+    while(q.length){
+      const [c,r]=q.shift(), d=dist.get(key(c,r));
+      if(d>=budget) continue;
+      for(const [dc,dr] of N4){
+        const nc=c+dc,nr=r+dr,k=key(nc,nr);
+        if(dist.has(k)||!passable(nc,nr,h)) continue;
+        dist.set(k,d+1); reach.set(k,d+1); q.push([nc,nr]);
+      }
+    }
+  }
+  S.reach=reach;
+}
+function computeAttackable(){
+  const set=new Set(), h=S.hero, R=heroRange();
+  if(!h.struck) for(const e of S.enemies) if(e.alive&&cheb(h,e)<=R) set.add(e);
+  S.attackable=set;
+}
+
+/* ============================ TURN FLOW ============================ */
+function beginPlayerTurn(){
+  const h=S.hero;
+  h.startCol=h.col; h.startRow=h.row;      // the mage shells this tile
+  h.moved=false; h.struck=false;
+  if(h.regen>0){ h.regen--; heal(2,'second wind'); }
+  computeReach(); computeAttackable();
+  S.phase='player'; updateHud(); tutorialCheck();
+  // Safety valve: if a turn opens with nothing you could possibly do — boxed in
+  // by walls with no foe in reach — pass it rather than freezing the game.
+  if(S.reach.size===0 && S.attackable.size===0 && !S.over){
+    if((S._idle=(S._idle||0)+1) < 12){ say('hemmed in — you wait for a gap.'); advance(); }
+  } else S._idle=0;
+}
+/* ---- turn order ---------------------------------------------------------
+   Your turn and theirs never overlap: your action resolves and is given a beat
+   to read, then the whole city moves together, then control comes back. The
+   enemies act as one group — eased movement keeps that readable. */
+const PLAYER_BEAT=300, ENEMY_BEAT=420;
+
+function advance(){
+  const h=S.hero;
+  if(h.extraTurn){                          // Quick Attack: one free extra turn
+    h.extraTurn=false;
+    say('quick attack — you move again before they react.');
+    beginPlayerTurn(); return;
+  }
+  S.phase='enemy'; updateHud();
+  const gen=S.gen;
+  setTimeout(()=>{                          // let your own move land first
+    if(S.over||S.phase!=='enemy'||gen!==S.gen) return;
+    // fixed order so ranged fire resolves before the melee press closes,
+    // but all of it lands within the same visual beat
+    for(const e of S.enemies.filter(e=>e.alive&&e.ai==='kite'))  { archerAct(e); if(S.over)return; }
+    for(const e of S.enemies.filter(e=>e.alive&&e.ai==='shell')) { mageAct(e);   if(S.over)return; }
+    for(const e of S.enemies.filter(e=>e.alive&&e.ai==='chase')) { gruntAct(e);  if(S.over)return; }
+    setTimeout(()=>{                        // let their movement finish easing
+      if(S.over||S.phase!=='enemy'||gen!==S.gen) return;
+      endEnemyPhase();
+    }, ENEMY_BEAT);
+  }, PLAYER_BEAT);
+}
+function endEnemyPhase(){
+  if(S.over) return;
+  tickPoison();
+  if(S.over) return;
+  for(const k in S.hero.buffs) if(--S.hero.buffs[k]<=0) delete S.hero.buffs[k];
+  S.round++;
+  beginPlayerTurn();
+}
+/* After a step: if nothing is in reach to hit, the turn is over — no button
+   needed. If a foe IS in reach, we pause so you can choose to strike or hold. */
+function maybeEndTurn(){
+  computeReach(); computeAttackable();
+  if(S.attackable.size===0) advance();
+  else { updateHud(); tutorialCheck(); }
+}
+function endTurn(){ if(S.phase==='player'&&!S.over) advance(); }
+
+function playerStep(c,r){
+  const h=S.hero;
+  if(S.phase!=='player'||S.over||h.moved) return;
+  if(!S.reach.has(key(c,r))) return;
+  h.col=c; h.row=r; h.moved=true;
+  if(S.shrines.has(key(c,r))) takeShrine(key(c,r));
+  if(tut) tut.moved=true;
+  maybeEndTurn();
+}
+function playerStrike(e,type){
+  const h=S.hero;
+  if(S.phase!=='player'||S.over||h.struck||!e.alive) return;
+  const magic = type==='magic';
+  const R = magic? Math.max(2,heroRange()) : heroRange();
+  if(cheb(h,e)>R) return;
+  if(magic){
+    const cost=mpCost(SKILLS.arcane_bolt.mp);
+    if(h.mp<cost){ say('not enough magic to shape a bolt.'); return; }
+    if(useLeft('arcane_bolt')<=0){ say('the bolt will not come again this battle.'); return; }
+    h.mp-=cost; spendUse('arcane_bolt');
+  }
+  h.struck=true;
+  const dist=cheb(h,e);
+  h.anim={t:performance.now(),kind:magic?'cast':(dist>1?'shoot':'melee'),dir:e.col>=h.col?1:-1};
+  addFx(magic?{type:'bolt',from:{c:h.col,r:h.row},to:{c:e.col,r:e.row}}
+             :(dist>1?{type:'shot',from:{c:h.col,r:h.row},to:{c:e.col,r:e.row},col:'#dcd6e8'}:null));
+  const p=heroProfile(type);
+  const dmg=calcDamage({...p,def:e.def,vuln:e.vuln});
+  say(magic? `your bolt breaks over the ${e.name.toLowerCase()}.`
+           : `you strike the ${e.name.toLowerCase()}.`);
+  hurtEnemy(e,dmg);
+  if(S.hero.buffs.poison) { e.poison=(e.poison||0)+3; say('poison takes root.'); }
+  if(!S.enemies.some(x=>x.alive)){ clearFloor(); return; }
+  if(tut) tut.struck=true;
+  advance();                    // striking commits your turn — the city answers
+}
+function useLeft(id){
+  const k=SKILLS[id]; if(!k||!k.uses) return 1;
+  return k.uses - (S.hero.uses[id]||0);
+}
+function spendUse(id){ S.hero.uses[id]=(S.hero.uses[id]||0)+1; }
+
+function hurtEnemy(e,n){
+  e.hp-=n;
+  e.flash=performance.now();
+  shake(Math.min(3,1+n*.4));
+  addFx({type:'num',col:e.col,row:e.row,txt:'-'+n,col2:'#f0c987'});
+  addFx({type:'ring',col:e.col,row:e.row,col2:'rgba(240,207,138,.9)',dur:340});
+  if(e.hp<=0){ e.alive=false; say(`the ${e.name.toLowerCase()} falls silent.`); }
+}
+/* camera kick — weight you feel instead of a number you read */
+let shakeAmt=0;
+function shake(n){ shakeAmt=Math.max(shakeAmt,n); }
+function heal(n,src){
+  const h=S.hero, before=h.hp;
+  h.hp=Math.min(maxHp(),h.hp+n);
+  if(h.hp>before){ addFx({type:'num',col:h.col,row:h.row,txt:'+'+(h.hp-before),col2:'#6fd47a'});
+    say(`${src} restores ${h.hp-before} hp.`); }
+  updateHud();
+}
+function hurtHero(n,src,type,from){
+  const h=S.hero;
+  if(h.dodge){ h.dodge=false; say(`you slip aside — the ${src} finds nothing.`);
+    addFx({type:'ring',col:h.col,row:h.row,col2:'#54dbd6'}); return; }
+  if(type==='magic' && h.barrier){
+    h.barrier=false;
+    say('the barrier rebounds the spell.');
+    if(from&&from.alive) hurtEnemy(from,n);
+    addFx({type:'ring',col:h.col,row:h.row,col2:'#a86ede'});
+    return;
+  }
+  h.hp=Math.max(0,h.hp-n);
+  h.flash=performance.now(); shake(2+n);
+  addFx({type:'num',col:h.col,row:h.row,txt:'-'+n,col2:'#ff5c6a'});
+  addFx({type:'flash'});
+  if(h.hp<=0){ updateHud(); gameOver(); }
+}
+function tickPoison(){
+  for(const e of S.enemies){
+    if(e.alive&&e.poison>0){ e.poison--; hurtEnemy(e,1); }
+  }
+  if(!S.enemies.some(x=>x.alive)&&!S.over) clearFloor();
+}
+
+/* ============================ ENEMY AI ============================ */
+function enemyHit(e,type){
+  const vuln = S.hero.buffs.madness?1:0;
+  return calcDamage({basic:e.bd,extra:0,hits:1,def:heroDef(),type:type||e.dtype,vuln});
+}
+function gruntAct(e){
+  const h=S.hero;
+  // Melee reach must match the pilgrim's: all 8 surrounding tiles. Using
+  // orthogonal-only here let you stand on a diagonal and hit it for free.
+  if(cheb(e,h)<=(e.range||1)){
+    e.anim={t:performance.now(),kind:'melee',dir:h.col>=e.col?1:-1};
+    const d=enemyHit(e);
+    say(`the ${e.name.toLowerCase()} lands a blow.`);
+    hurtHero(d,'blow','physical',e); return;
+  }
+  const start=key(e.col,e.row), prev=new Map([[start,null]]), q=[[e.col,e.row]];
+  let found=false;
+  while(q.length&&!found){
+    const [c,r]=q.shift();
+    for(const [dc,dr] of N4){
+      const nc=c+dc,nr=r+dr,k=key(nc,nr);
+      if(prev.has(k)) continue;
+      if(nc===h.col&&nr===h.row){ prev.set(k,key(c,r)); found=true; break; }
+      if(!passable(nc,nr,e)) continue;
+      prev.set(k,key(c,r)); q.push([nc,nr]);
+    }
+  }
+  let cur=key(h.col,h.row), step=null;
+  if(prev.has(cur)){
+    while(prev.get(cur)!==start&&prev.get(cur)!=null) cur=prev.get(cur);
+    if(prev.get(cur)===start) step=cur;
+  }
+  if(step){ const [c,r]=step.split(',').map(Number); e.col=c; e.row=r; }
+}
+/* The archer obeys the same economy you do: it either repositions OR fires,
+   never both. Crowd it and it gives ground without shooting — that retreat is
+   your window to close. Corner it, or break its line with cover. */
+function archerAct(e){
+  const h=S.hero;
+  // It cannot give ground two turns running, so you always gain a tile every
+  // other turn — the chase resolves instead of running forever.
+  const crowded = cheb(e,h)<=3 && !e.gaveGround;
+  e.gaveGround=false;
+  if(crowded){
+    let best=null,bd=cheb(e,h);
+    for(const [dc,dr] of N4){
+      const nc=e.col+dc,nr=e.row+dr;
+      if(!passable(nc,nr,e)) continue;
+      const d=Math.max(Math.abs(nc-h.col),Math.abs(nr-h.row));
+      if(d>bd){bd=d;best=[nc,nr];}
+    }
+    if(best){ e.col=best[0]; e.row=best[1]; e.gaveGround=true; return; }  // no shot
+  }
+  if(cheb(e,h)>2 && losClear(e,h)){
+    if(e.spent){ e.spent=false; return; }        // working the bolt — your window to close
+    if(S.hero.buffs.lightning){ say('lightning turns the arrow aside.'); return; }
+    e.anim={t:performance.now(),kind:'shoot',dir:h.col>=e.col?1:-1};
+    addFx({type:'shot',from:{c:e.col,r:e.row},to:{c:h.col,r:h.row},col:'#6fd47a'});
+    say(`the ${e.name.toLowerCase()} fires across the open ground.`);
+    e.spent=true;                                 // must reload before firing again
+    hurtHero(enemyHit(e),'arrow','physical',e);
+  }
+}
+function mageAct(e){
+  const h=S.hero, tc=h.startCol, tr=h.startRow;
+  e.anim={t:performance.now(),kind:'cast',dir:h.col>=e.col?1:-1};
+  addFx({type:'blast',col:tc,row:tr});
+  if(h.col===tc&&h.row===tr){
+    const d=enemyHit(e,'magic');
+    say('the shell finds you where you stood — your guard barely matters.');
+    hurtHero(d,'shell','magic',e);
+  } else say('a shell craters the ground you just left.');
+}
+
+/* ============================ SHRINES / ITEMS ============================ */
+const SHRINE_ROLLS=[
+  {n:'Energy Drink', f:()=>{heal(4,'energy drink'); S.hero.mp=Math.min(maxMp(),S.hero.mp+2);}},
+  {n:'Pure Water',   f:()=>{S.hero.mp=Math.min(maxMp(),S.hero.mp+4); say('pure water — magic returns.');}},
+  {n:'Cookies',      f:()=>heal(8,'cookies')},
+  {n:'Power of Fire',f:()=>{S.hero.buffs.fire=3; say('power of fire — +2 damage for 3 rounds.');}},
+  {n:'Freedom of Wind',f:()=>{S.hero.buffs.wind=3; say('freedom of wind — move +1 for 3 rounds.');}},
+  {n:'Whetstone',    f:()=>{S.hero.buffs.fire=99; say('whetstone — the edge holds.');}},
+  {n:'Poison Heart', f:()=>{S.hero.buffs.poison=3; say('poison heart — your strikes fester.');}},
+  {n:'Swiftness of Lightning',f:()=>{S.hero.buffs.lightning=3; say('swiftness — ranged attacks pass you by.');}},
+];
+function takeShrine(k){
+  const roll=SHRINE_ROLLS[Math.floor(Math.random()*SHRINE_ROLLS.length)];
+  S.shrines.delete(k);
+  const [c,r]=k.split(',').map(Number);
+  addFx({type:'ring',col:c,row:r,col2:'#f0c987'});
+  say(`shrine · ${roll.n.toLowerCase()}`);
+  roll.f();
+}
+
+/* ============================ FLOOR CLEAR / DRAFT ============================ */
+function clearFloor(){
+  S.phase='clear';
+  if(S.floor>=FLOORS.length-1){ win(); return; }
+  say('the floor is quiet. something is learned.');
+  setTimeout(openDraft,420);
+}
+function pick3(){
+  const owned=S.hero.skills;
+  let pool=SKILL_IDS.filter(id=>!owned.includes(id));
+  if(pool.length<3) pool=SKILL_IDS.slice();
+  const out=[];
+  while(out.length<3&&pool.length){
+    out.push(pool.splice(Math.floor(Math.random()*pool.length),1)[0]);
+  }
+  return out;
+}
+let pendingPick=null;
+function openDraft(){
+  const ids=pick3(), full=S.hero.skills.length>=5;
+  const box=document.getElementById('cards'); box.innerHTML='';
+  document.getElementById('draftTitle').textContent =
+    (S.floor===0?'TUTORIAL CLEARED':'FLOOR CLEARED')+' — CHOOSE A SKILL';
+  document.getElementById('draftSub').textContent =
+    full? 'You carry five. Choosing one will replace a skill.'
+        : `One of three. You carry ${S.hero.skills.length} of 5.`;
+  for(const id of ids){
+    const k=SKILLS[id];
+    const b=document.createElement('button'); b.className='card';
+    b.innerHTML=`<div class="cat">${k.cat}</div><div class="nm">${k.name}</div>
+      <div class="ds">${k.ds}</div>
+      <span class="tag ${k.kind==='active'?'act':''}">${k.kind}${k.uses?` · ${k.uses}/battle`:''}${k.mp?` · ${k.mp} MP`:''}</span>`;
+    b.onclick=()=>chooseSkill(id);
+    box.appendChild(b);
+  }
+  document.getElementById('draft').className='curtain show';
+}
+function chooseSkill(id){
+  if(S.hero.skills.length>=5){ pendingPick=id; promptReplace(); return; }
+  grant(id); closeDraft();
+}
+function promptReplace(){
+  const box=document.getElementById('cards'); box.innerHTML='';
+  document.getElementById('draftTitle').textContent='REPLACE WHICH SKILL?';
+  document.getElementById('draftSub').textContent=
+    `${SKILLS[pendingPick].name} will take its place.`;
+  for(const id of S.hero.skills){
+    const k=SKILLS[id];
+    const b=document.createElement('button'); b.className='card';
+    b.innerHTML=`<div class="cat">${k.cat}</div><div class="nm">${k.name}</div>
+      <div class="ds">${k.ds}</div><span class="tag">discard</span>`;
+    b.onclick=()=>{
+      S.hero.skills=S.hero.skills.filter(x=>x!==id);
+      say(`you set aside ${k.name.toLowerCase()}.`);
+      grant(pendingPick); pendingPick=null; closeDraft();
+    };
+    box.appendChild(b);
+  }
+}
+function grant(id){
+  S.hero.skills.push(id);
+  const k=SKILLS[id];
+  say(`skill learned — ${k.name.toLowerCase()}.`);
+  if(id==='vitality') S.hero.hp=Math.min(maxHp(),S.hero.hp+2);
+  S.hero.hp=Math.min(S.hero.hp,maxHp());
+  // the first spell you own is the first time MP means anything — say so then
+  if(k.mp) setTimeout(()=>teach('mp',
+    `The purple bar is magic. ${k.name} spends ${k.mp} of it.`,
+    'It refills at each new floor', 78, 30), 500);
+  if(k.kind==='active'&&!k.mp) setTimeout(()=>teach('active',
+    'Active skills sit under the board. Limited uses each battle.',
+    '', 50, 96), 500);
+  renderSlots();
+}
+function closeDraft(){
+  document.getElementById('draft').className='curtain';
+  S.floor++; S.hero.hp=Math.min(maxHp(),S.hero.hp+3);   // a breath between floors
+  loadFloor(S.floor);
+}
+
+/* ============================ END STATES ============================ */
+function gameOver(){
+  S.over='loss'; S.phase='over'; updateHud();
+  say('you fall. the city does not notice.');
+  showCurtain('loss','the world stays indifferent. the smog closes over a quiet shape.');
+}
+function win(){
+  S.over='win'; S.phase='over'; updateHud();
+  say('the warden is silent. the district exhales.');
+  showCurtain('win','the tyrant’s reign ends where you stand. the palette warms to gold.');
+}
+function showCurtain(res,poem){
+  const c=document.getElementById('curtain');
+  c.className='curtain show '+res;
+  document.getElementById('poem').textContent='“'+poem.toUpperCase()+'”';
+}
+
+/* ============================ TUTORIAL BUBBLES ============================
+   One idea per beat, anchored to the thing it describes, gated on the action. */
+const TUT=[
+ {txt:'You. The pilgrim.', go:'Click a glowing tile to step', at:'hero',
+  done:()=>tut.moved},
+ {txt:'A shrine.', go:'Step onto the diamond', at:'shrine',
+  done:()=>S.shrines.size===0},
+ {txt:'Shrines give you something — a heal, or an edge.', at:'hero', ttl:3000,
+  done:()=>{const e=S.enemies.find(x=>x.alive); return e&&cheb(S.hero,e)<=heroRange();}},
+ {txt:'A grunt. Close the gap.', go:'Step until you are beside it', at:'enemy',
+  done:()=>{const e=S.enemies.find(x=>x.alive); return e&&cheb(S.hero,e)<=heroRange();}},
+ {txt:'Strike it.', go:'Click the grunt, or the Strike button', at:'enemy',
+  done:()=>tut.struck},
+ {txt:'It hits back. Finish it.', at:'enemy', ttl:2600,      // fades on its own
+  done:()=>!S.enemies.some(e=>e.alive)},
+];
+function tutorialCheck(){
+  if(!tut){ renderBubbles([]); return; }
+  const before=tut.step;
+  while(tut.step<TUT.length && TUT[tut.step].done()) tut.step++;
+  if(tut.step!==before) tut.shownAt=performance.now();   // new beat, restart its clock
+  if(tut.step>=TUT.length){ renderBubbles([]); return; }
+  const s=TUT[tut.step];
+  if(!tut.shownAt) tut.shownAt=performance.now();
+  // a timed beat never parks on screen — it says its piece and gets out of the way
+  if(s.ttl && performance.now()-tut.shownAt>s.ttl){ renderBubbles([]); return; }
+  if(s.ttl) setTimeout(()=>{ if(tut&&tut.step===TUT.indexOf(s)) tutorialCheck(); }, s.ttl+30);
+  let c,r;
+  if(s.at==='hero'){ c=S.hero.col; r=S.hero.row; }
+  else if(s.at==='shrine'){
+    const k=[...S.shrines][0];
+    if(!k){ c=S.hero.col; r=S.hero.row; }
+    else { [c,r]=k.split(',').map(Number); }
+  }
+  else { const e=S.enemies.find(x=>x.alive)||S.hero; c=e.col; r=e.row; }
+  renderBubbles([{c,r,txt:s.txt,go:s.go}]);
+}
+function renderBubbles(list){
+  const box=document.getElementById('bubbles');
+  box.innerHTML='';
+  for(const b of (list||[])){
+    const d=document.createElement('div'); d.className='bubble';
+    // anchor either to a board tile, or to a point on the panel (x/y in %)
+    d.style.left=(b.x!=null? b.x : cx(b.c)/W*100)+'%';
+    d.style.top =(b.y!=null? b.y : (tileY(b.r)-4)/H*100)+'%';
+    d.innerHTML=`${b.txt}${b.go?`<span class="go">${b.go}</span>`:''}`;
+    box.appendChild(d);
+  }
+  if(pinned) for(const b of [pinned]){
+    const d=document.createElement('div'); d.className='bubble';
+    d.style.left=b.x+'%'; d.style.top=b.y+'%';
+    d.innerHTML=`${b.txt}${b.go?`<span class="go">${b.go}</span>`:''}`;
+    box.appendChild(d);
+  }
+}
+/* One-off just-in-time lessons: a mechanic is explained the first time it can
+   actually be used, anchored to the meter it concerns — never up front. */
+let pinned=null, taught={};
+function teach(id,txt,go,x,y,ms=5200){
+  if(taught[id]) return; taught[id]=true;
+  pinned={txt,go,x,y};
+  renderBubbles(null); tutorialCheck();
+  setTimeout(()=>{ pinned=null; tutorialCheck(); }, ms);
+}
+
+/* ============================ HUD ============================ */
+function say(t){
+  if(S.log[S.log.length-1]===t) return;      // don't let a repeated line flood the record
+  S.log.push(t); if(S.log.length>7) S.log.shift(); renderLog();
+}
+function renderLog(){
+  const el=document.getElementById('log'); el.innerHTML='';
+  S.log.forEach((t,i)=>{ const d=document.createElement('div');
+    d.textContent='· '+t; if(i===S.log.length-1) d.className='now'; el.appendChild(d); });
+}
+function pips(el,n,max,cls,label){
+  el.innerHTML='';
+  if(label){ const t=document.createElement('span');
+    t.textContent=label; t.style.cssText=
+      'font-size:8px;letter-spacing:.14em;opacity:.5;margin-right:4px;align-self:center';
+    el.appendChild(t); }
+  for(let i=0;i<max;i++){ const d=document.createElement('div');
+    d.className='pip'+(cls?' '+cls:'')+(i<n?'':' off'); el.appendChild(d); }
+}
+function updateHud(){
+  const h=S.hero;
+  document.getElementById('hRound').textContent='ROUND '+S.round;
+  document.getElementById('hFoes').textContent='FOES · '+S.enemies.filter(e=>e.alive).length;
+  pips(document.getElementById('hHp'),h.hp,maxHp(),'','HP');
+  pips(document.getElementById('hMp'),h.mp,maxMp(),'mp','MP');
+  const b=[];
+  for(const k in h.buffs) b.push(k.toUpperCase()+(h.buffs[k]<90?'·'+h.buffs[k]:''));
+  if(h.dodge) b.push('DODGE READY'); if(h.barrier) b.push('BARRIER');
+  if(h.regen>0) b.push('REGEN·'+h.regen);
+  document.getElementById('hBuff').textContent=b.join('  ');
+
+  // No prompt text when a strike is offered — the pulsing button says it.
+  const hint=document.getElementById('hMath');
+  const offering = !S.over && S.phase==='player' && S.attackable.size>0;
+  hint.innerHTML = (S.over||S.phase==='enemy'||offering)? ''
+    : 'Click a glowing tile to step';
+  hint.className='math';
+
+  const ph=document.getElementById('hPhase');
+  ph.textContent = S.over? (S.over==='win'?'DISTRICT CLEAR':'FALLEN')
+                 : S.phase==='enemy'? 'ENEMY TURN' : 'YOUR TURN';
+  ph.className='phase'+(S.phase==='enemy'?' enemy':'');
+
+  const playing = S.phase==='player'&&!S.over;
+  // An attack offer is the moment the game is waiting on you, so it gets a
+  // real button per target — not just a ring on the board you might miss.
+  const row=document.getElementById('strikeBtns');
+  row.innerHTML='';
+  if(playing) for(const e of S.attackable){
+    const b=document.createElement('button');
+    b.className='strike';
+    b.textContent=`Strike ${e.name}`;      // no glyph: the mono stack lacks ⚔
+    b.onclick=()=>playerStrike(e,'physical');
+    row.appendChild(b);
+  }
+  // "Hold" only exists when declining to strike is an actual decision;
+  // otherwise the turn ends by itself and the button stays out of the way.
+  const btnEnd=document.getElementById('btnEnd');
+  const canHold = playing && S.attackable.size>0;
+  btnEnd.style.display = canHold? '' : 'none';
+  btnEnd.textContent = 'Hold — don’t strike ␣';
+  btnEnd.disabled = !canHold;
+  const bolt=document.getElementById('btnBolt');
+  const owns=has('arcane_bolt');
+  bolt.style.display=owns?'':'none';
+  bolt.disabled=!playing||h.struck||h.mp<mpCost(2)||useLeft('arcane_bolt')<=0;
+  bolt.textContent=`Arcane Bolt (${useLeft('arcane_bolt')}) ${mpCost(2)}MP`;
+  const acts=S.hero.skills.filter(id=>SKILLS[id].kind==='active'&&id!=='arcane_bolt');
+  [1,2].forEach(i=>{
+    const el=document.getElementById('btnAct'+i), id=acts[i-1];
+    if(!id){ el.style.display='none'; return; }
+    el.style.display='';
+    const k=SKILLS[id], left=useLeft(id);
+    el.textContent=`${k.name} (${left})`;
+    el.disabled=!playing||left<=0||(k.mp&&h.mp<mpCost(k.mp))||
+      (id==='dodge'&&h.dodge)||(id==='magic_barrier'&&h.barrier);
+    el.onclick=()=>useActive(id);
+  });
+  renderSlots();
+}
+function useActive(id){
+  const h=S.hero, k=SKILLS[id];
+  if(useLeft(id)<=0) return;
+  if(k.mp&&h.mp<mpCost(k.mp)) return;
+  if(k.mp) h.mp-=mpCost(k.mp);
+  spendUse(id);
+  if(id==='dodge'){ h.dodge=true; say('you set your feet — the next blow will miss.'); }
+  if(id==='magic_barrier'){ h.barrier=true; say('a barrier hums into place.'); }
+  if(id==='second_wind'){ h.regen=5; heal(2,'second wind'); }
+  if(id==='healing'){ heal(maxHp(),'healing'); }
+  updateHud();
+}
+function renderSlots(){
+  const el=document.getElementById('slots'); if(!el) return;
+  el.innerHTML='';
+  document.getElementById('slotCount').textContent=`${S.hero.skills.length}/5`;
+  for(const id of S.hero.skills){
+    const k=SKILLS[id];
+    const d=document.createElement('div'); d.className='slot';
+    d.innerHTML=`<div class="dot ${k.kind==='active'?'act':''}"></div>
+      <div><div class="nm">${k.name}</div><div class="ds">${k.ds}</div></div>`;
+    el.appendChild(d);
+  }
+  for(let i=S.hero.skills.length;i<5;i++){
+    const d=document.createElement('div'); d.className='slot empty';
+    d.textContent='empty slot'; el.appendChild(d);
+  }
+}
+
+/* ============================ RENDER ============================ */
+const PAL={ground:'#1b1330',groundAlt:'#20163a',grid:'rgba(84,219,214,.09)',
+  wallFront:'#413c52',wallTop:'#655f75',terrace:'#6fae7a',shrine:'#e9cf8a'};
+
+let bg=null;
+function buildBg(){
+  bg=document.createElement('canvas'); bg.width=W; bg.height=H;
+  const g=bg.getContext('2d');
+  const sky=g.createLinearGradient(0,0,0,BY+8);
+  sky.addColorStop(0,'#160b26'); sky.addColorStop(.7,'#3a1740'); sky.addColorStop(1,'#5e2452');
+  g.fillStyle=sky; g.fillRect(0,0,W,BY+8);
+  g.fillStyle='#b98fb0'; g.globalAlpha=.9;
+  g.beginPath(); g.arc(258,20,9,0,7); g.fill();
+  g.globalAlpha=.15; g.beginPath(); g.arc(258,20,14,0,7); g.fill(); g.globalAlpha=1;
+  const slabs=[[10,20,60,26],[30,12,52,34],[58,24,44,22],[92,16,40,30],[126,26,30,20],
+               [150,10,58,36],[204,22,40,24],[236,16,34,30],[268,24,44,22],[300,18,26,28]];
+  for(const [x,y,w] of slabs){
+    g.fillStyle='#0c0716'; g.fillRect(x,y,w,BY-y+2);
+    g.fillStyle='#241a34'; g.fillRect(x,y,w,2);
+    for(let wy=y+4;wy<BY-3;wy+=6) for(let wx=x+3;wx<x+w-2;wx+=6)
+      if(Math.random()<.32){ g.fillStyle=Math.random()<.5?'#54dbd6':'#ff5c9a';
+        g.globalAlpha=.5+Math.random()*.4; g.fillRect(wx,wy,2,2); g.globalAlpha=1; }
+    if(w>34){ g.fillStyle=PAL.terrace;
+      for(let tx=x+2;tx<x+w-2;tx+=4) if(Math.random()<.5) g.fillRect(tx,y+2,2,2); }
+  }
+  g.fillStyle='#0f0a1c'; g.fillRect(0,BY,W,H-BY);
+}
+
+function drawBoard(now){
+  for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){
+    ctx.fillStyle=((c+r)&1)?PAL.groundAlt:PAL.ground;
+    ctx.fillRect(tileX(c),tileY(r),TILE,TILE);
+  }
+  ctx.strokeStyle=PAL.grid; ctx.lineWidth=1;
+  for(let c=0;c<=COLS;c++){ctx.beginPath();ctx.moveTo(tileX(c)+.5,BY);ctx.lineTo(tileX(c)+.5,BY+ROWS*TILE);ctx.stroke();}
+  for(let r=0;r<=ROWS;r++){ctx.beginPath();ctx.moveTo(BX,tileY(r)+.5);ctx.lineTo(BX+COLS*TILE,tileY(r)+.5);ctx.stroke();}
+
+  // archer watch field
+  for(const e of S.enemies){
+    if(!e.alive||e.ai!=='kite') continue;
+    ctx.fillStyle='rgba(111,212,122,.06)';
+    for(let dr=-2;dr<=2;dr++) for(let dc=-2;dc<=2;dc++){
+      const c=e.col+dc,r=e.row+dr;
+      if(inB(c,r)&&!isWall(c,r)) ctx.fillRect(tileX(c),tileY(r),TILE,TILE);
+    }
+  }
+  // shrines
+  for(const k of S.shrines){
+    const [c,r]=k.split(',').map(Number);
+    const b=.6+.4*Math.sin(now/300+c);
+    ctx.fillStyle=PAL.shrine; ctx.globalAlpha=b; diamond(cx(c),cyr(r),5); ctx.globalAlpha=1;
+    ctx.fillStyle='rgba(240,207,138,.18)'; diamond(cx(c),cyr(r),8);
+  }
+  // reachable
+  if(S.phase==='player'&&!S.over){
+    const b=.5+.35*Math.sin(now/240);
+    ctx.strokeStyle=`rgba(84,219,214,${b.toFixed(2)})`; ctx.lineWidth=1;
+    for(const k of S.reach.keys()){
+      const [c,r]=k.split(',').map(Number);
+      ctx.strokeRect(tileX(c)+2.5,tileY(r)+2.5,TILE-5,TILE-5);
+    }
+  }
+  // walls
+  for(const k of S.walls){
+    const [c,r]=k.split(',').map(Number), x=tileX(c), y=tileY(r);
+    ctx.fillStyle=PAL.wallFront; ctx.fillRect(x+1,y+1,TILE-2,TILE-2);
+    ctx.fillStyle=PAL.wallTop; ctx.fillRect(x+1,y+1,TILE-2,4);
+    ctx.fillStyle='rgba(0,0,0,.35)'; ctx.fillRect(x+1,y+TILE-4,TILE-2,3);
+    ctx.fillStyle=PAL.terrace;
+    ctx.fillRect(x+3,y+2,2,2); ctx.fillRect(x+TILE-6,y+2,2,2); ctx.fillRect(x+TILE/2,y+2,2,2);
+  }
+  // mage reticle
+  if(S.phase==='player'&&!S.over&&S.enemies.some(e=>e.alive&&e.ai==='shell')){
+    const c=S.hero.startCol,r=S.hero.startRow,x=cx(c),y=cyr(r);
+    const b=.45+.4*Math.sin(now/180);
+    ctx.strokeStyle=`rgba(111,212,122,${b.toFixed(2)})`; ctx.lineWidth=1;
+    ctx.strokeRect(tileX(c)+3.5,tileY(r)+3.5,TILE-7,TILE-7);
+    ctx.beginPath();ctx.moveTo(x-6,y);ctx.lineTo(x+6,y);ctx.moveTo(x,y-6);ctx.lineTo(x,y+6);ctx.stroke();
+  }
+  // strikeable rings
+  if(S.phase==='player'&&!S.over){
+    for(const e of S.attackable){
+      const b=.5+.4*Math.sin(now/200);
+      ctx.strokeStyle=`rgba(255,92,106,${b.toFixed(2)})`; ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.arc(cx(e.col),cyr(e.row),TILE*.44,0,7); ctx.stroke();
+    }
+  }
+  if(hover&&S.phase==='player'&&!S.over&&S.reach.has(key(hover.col,hover.row))){
+    ctx.fillStyle='rgba(84,219,214,.12)';
+    ctx.fillRect(tileX(hover.col),tileY(hover.row),TILE,TILE);
+  }
+}
+function diamond(x,y,s){ctx.beginPath();ctx.moveTo(x,y-s);ctx.lineTo(x+s,y);ctx.lineTo(x,y+s);ctx.lineTo(x-s,y);ctx.closePath();ctx.fill();}
+
+/* ---------- SPRITES (matched to the sheets) ---------- */
+const HERO={cloak:'#3a1f5c',cloak2:'#2a1442',hood:'#1a0d2b',skin:'#e8e0f0',
+  pack:'#4a2a6e',trim:'#a86ede',melee:'#ff4a5c',ranged:'#dcd6e8'};
+const FOE={body:'#2f5c38',body2:'#1f3d26',trim:'#6fd47a',skin:'#cfe8d2',metal:'#8fb896'};
+
+function animOf(u){
+  if(!u.anim) return null;
+  const p=(performance.now()-u.anim.t)/380;
+  if(p>=1){ u.anim=null; return null; }
+  return {p,kind:u.anim.kind,dir:u.anim.dir};
+}
+/* Visual position eases toward the logical tile, so a step reads as a step
+   rather than a teleport — you can see who moved and where. */
+const pxOf=v=>BX+v*TILE+TILE/2, pyOf=v=>BY+v*TILE;
+function vis(u){
+  if(u.vx===undefined){ u.vx=u.col; u.vy=u.row; }
+  u.vx+=(u.col-u.vx)*0.3; u.vy+=(u.row-u.vy)*0.3;
+  if(Math.abs(u.col-u.vx)<0.008) u.vx=u.col;
+  if(Math.abs(u.row-u.vy)<0.008) u.vy=u.row;
+  return [u.vx,u.vy];
+}
+const isMoving=u=>u.vx!==undefined&&(u.vx!==u.col||u.vy!==u.row);
+function shadow(x,yTop){
+  ctx.fillStyle='rgba(0,0,0,.35)';
+  ctx.beginPath(); ctx.ellipse(x,yTop+TILE-4,7,3,0,0,7); ctx.fill();
+}
+/* spin arc — the signature move from the sheet */
+function spinArc(x,y,p,color,wide){
+  ctx.save(); ctx.translate(x,y);
+  ctx.globalAlpha=1-p*.5;
+  ctx.strokeStyle=color; ctx.lineWidth=2;
+  ctx.beginPath();
+  ctx.ellipse(0,0,wide?13:11,4.5,0,p*Math.PI*2,p*Math.PI*2+Math.PI*1.5);
+  ctx.stroke();
+  ctx.globalAlpha=(1-p)*.5; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.ellipse(0,0,wide?15:13,5.5,0,0,7); ctx.stroke();
+  ctx.restore(); ctx.globalAlpha=1;
+}
+function drawHero(now){
+  const a=animOf(S.hero);
+  const [vx,vy]=vis(S.hero);
+  const x=pxOf(vx), y=pyOf(vy)+TILE-5;
+  const bob=(a||isMoving(S.hero))?0:Math.round(Math.sin(now/400)*0.5);
+  shadow(x,pyOf(vy));
+  if(a&&a.kind==='melee') spinArc(x,y-7,a.p,HERO.melee,false);
+  if(a&&(a.kind==='shoot'||a.kind==='cast')) spinArc(x,y-7,a.p,HERO.ranged,true);
+  // backpack
+  ctx.fillStyle=HERO.pack; ctx.fillRect(x-6,y-11+bob,3,7);
+  // cloak (blocky silhouette, sheet-style)
+  ctx.fillStyle=HERO.cloak2; ctx.fillRect(x-4,y-13+bob,9,13);
+  ctx.fillStyle=HERO.cloak;  ctx.fillRect(x-3,y-13+bob,7,11);
+  ctx.fillRect(x-5,y-2,10,2);
+  // hood + face slit
+  ctx.fillStyle=HERO.hood; ctx.fillRect(x-3,y-17+bob,7,5);
+  ctx.fillStyle=HERO.skin; ctx.fillRect(x-1,y-15+bob,3,2);
+  // trim rim-light
+  ctx.fillStyle=HERO.trim; ctx.globalAlpha=.85;
+  ctx.fillRect(x+4,y-13+bob,1,10); ctx.fillRect(x-3,y-17+bob,1,2);
+  ctx.globalAlpha=1;
+}
+/* Grunt — armoured knight: helm with a lit visor slit, pauldrons, blade held
+   out to the side, and a wide green slash arc when it swings. */
+function drawGrunt(e,now){
+  const a=animOf(e), [vx,vy]=vis(e), x=pxOf(vx), y=pyOf(vy)+TILE-5;
+  const d=a?a.dir:(S.hero.col>=e.col?1:-1);
+  const lunge=(a&&a.kind==='melee')? Math.sin(a.p*Math.PI)*3 : 0;
+  shadow(x,pyOf(vy));
+  if(a&&a.kind==='melee'){                       // sweeping green arc
+    ctx.save(); ctx.translate(x+d*10+lunge,y-8); ctx.scale(d,1);
+    ctx.globalAlpha=1-a.p; ctx.strokeStyle=FOE.trim; ctx.lineWidth=2.5;
+    ctx.beginPath(); ctx.arc(0,0,8,-1.25,1.25); ctx.stroke();
+    ctx.globalAlpha=(1-a.p)*.5; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.arc(0,0,11,-1.05,1.05); ctx.stroke();
+    ctx.restore(); ctx.globalAlpha=1;
+  }
+  const bx=x+lunge*d;
+  ctx.fillStyle='#12240f'; ctx.fillRect(bx-5,y-13,11,13);      // dark underplate
+  ctx.fillStyle=FOE.body;  ctx.fillRect(bx-4,y-12,9,11);       // cuirass
+  ctx.fillStyle=FOE.metal; ctx.fillRect(bx-5,y-12,11,2);       // pauldrons
+  ctx.fillRect(bx-4,y-7,9,1);                                   // belt
+  ctx.fillStyle='#12240f'; ctx.fillRect(bx-3,y-17,7,5);        // helm
+  ctx.fillStyle=FOE.trim;  ctx.fillRect(bx-2,y-15,5,1.5);      // lit visor slit
+  ctx.fillStyle=FOE.metal;                                      // blade
+  ctx.fillRect(bx+d*5,y-12,d*8,1.5);
+  ctx.fillStyle=FOE.body2; ctx.fillRect(bx+d*4,y-13,d*2,3);    // hilt
+  ctx.fillStyle='#12240f'; ctx.fillRect(bx-6,y-1,12,2);        // boots
+}
+/* Archer — lanky rifleman: long coat, a rifle held level, green muzzle flash. */
+function drawArcher(e,now){
+  const a=animOf(e), [vx,vy]=vis(e), x=pxOf(vx), y=pyOf(vy)+TILE-5;
+  const d=a?a.dir:(S.hero.col>=e.col?1:-1);
+  const kick=(a&&a.kind==='shoot')? -Math.sin(a.p*Math.PI)*1.5*d : 0;
+  shadow(x,pyOf(vy));
+  const bx=x+kick;
+  ctx.fillStyle='#12240f'; ctx.fillRect(bx-3,y-14,7,14);       // long coat
+  ctx.fillStyle=FOE.body;  ctx.fillRect(bx-2,y-13,5,12);
+  ctx.fillStyle=FOE.body2; ctx.fillRect(bx-3,y-4,7,4);         // coat tails
+  ctx.fillStyle=FOE.skin;  ctx.fillRect(bx-2,y-17,5,4);        // head
+  ctx.fillStyle=FOE.trim;  ctx.fillRect(bx+(d>0?0:-1),y-16,2,1); // eye glint
+  // rifle, held level and long
+  ctx.fillStyle=FOE.metal;
+  ctx.fillRect(d>0? bx+1 : bx-12, y-11, 11, 1.5);
+  ctx.fillStyle=FOE.body2; ctx.fillRect(d>0? bx : bx-2, y-11.5, 3, 3);  // stock
+  if(a&&a.kind==='shoot'){                                      // muzzle flash
+    const mx = d>0? bx+12 : bx-14;
+    ctx.globalAlpha=1-a.p; ctx.fillStyle=FOE.trim;
+    ctx.fillRect(mx,y-12,4,3);
+    ctx.globalAlpha=(1-a.p)*.6; ctx.fillRect(mx+d*3,y-11.5,3,2);
+    ctx.globalAlpha=1;
+  }
+  ctx.fillStyle='#12240f'; ctx.fillRect(bx-4,y-1,9,2);
+}
+/* Mage — caster hauling a glowing orb rig; the orb swells before it fires. */
+function drawMage(e,now){
+  const a=animOf(e), [vx,vy]=vis(e), x=pxOf(vx), y=pyOf(vy)+TILE-5;
+  const d=a?a.dir:(S.hero.col>=e.col?1:-1);
+  shadow(x,pyOf(vy));
+  ctx.fillStyle='#12240f'; ctx.fillRect(x-5,y-14,10,14);       // heavy frame
+  ctx.fillStyle=FOE.body;  ctx.fillRect(x-4,y-13,8,12);
+  ctx.fillStyle=FOE.metal; ctx.fillRect(x-4,y-8,8,1);          // rig strap
+  ctx.fillStyle=FOE.skin;  ctx.fillRect(x-3,y-17,6,4);         // head
+  ctx.fillStyle=FOE.trim;  ctx.fillRect(x-2,y-16,1.5,1);
+  // emitter arm
+  ctx.fillStyle=FOE.metal; ctx.fillRect(d>0? x+3 : x-8, y-11, 6, 2);
+  // the orb — pulses idle, flares as it casts
+  const cast=a&&a.kind==='cast', p=cast?a.p:0;
+  const rad=cast? 3+Math.sin(p*Math.PI)*2.6 : 2.4+0.5*Math.sin(now/240);
+  const ox=d>0? x+9 : x-9, oy=y-10;
+  ctx.globalAlpha=cast? 1 : .55+.25*Math.sin(now/240);
+  ctx.fillStyle=FOE.trim;
+  ctx.beginPath(); ctx.arc(ox,oy,rad,0,7); ctx.fill();
+  ctx.globalAlpha=(cast?.5:.18);
+  ctx.beginPath(); ctx.arc(ox,oy,rad*2.1,0,7); ctx.fill();
+  ctx.globalAlpha=1;
+  ctx.fillStyle='#12240f'; ctx.fillRect(x-5,y-1,10,2);
+}
+/* Warden — the knight writ large: broader plate, twin visor lights, greatsword. */
+function drawWarden(e,now){
+  const a=animOf(e), [vx,vy]=vis(e), x=pxOf(vx), y=pyOf(vy)+TILE-5;
+  const d=a?a.dir:(S.hero.col>=e.col?1:-1);
+  const lunge=(a&&a.kind==='melee')? Math.sin(a.p*Math.PI)*4 : 0;
+  shadow(x,pyOf(vy));
+  if(a&&a.kind==='melee'){
+    ctx.save(); ctx.translate(x+d*11+lunge,y-9); ctx.scale(d,1);
+    ctx.globalAlpha=1-a.p; ctx.strokeStyle=FOE.trim; ctx.lineWidth=3.5;
+    ctx.beginPath(); ctx.arc(0,0,10,-1.35,1.35); ctx.stroke();
+    ctx.globalAlpha=(1-a.p)*.45; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.arc(0,0,14,-1.1,1.1); ctx.stroke();
+    ctx.restore(); ctx.globalAlpha=1;
+  }
+  const bx=x+lunge*d;
+  ctx.fillStyle='#0c1a0a'; ctx.fillRect(bx-7,y-17,15,17);
+  ctx.fillStyle=FOE.body2; ctx.fillRect(bx-6,y-16,13,15);
+  ctx.fillStyle=FOE.metal; ctx.fillRect(bx-7,y-16,15,2.5);    // heavy pauldrons
+  ctx.fillRect(bx-6,y-9,13,1.5);
+  ctx.fillStyle='#0c1a0a'; ctx.fillRect(bx-4,y-20,9,5);       // great helm
+  ctx.fillStyle=FOE.trim;                                      // twin visor lights
+  ctx.fillRect(bx-2.5,y-18,2,1.5); ctx.fillRect(bx+1.5,y-18,2,1.5);
+  ctx.fillStyle=FOE.metal; ctx.fillRect(bx+d*6,y-14,d*11,2.5); // greatsword
+  ctx.fillStyle=FOE.body2; ctx.fillRect(bx+d*5,y-16,d*2,5);   // crossguard
+  ctx.fillStyle='#0c1a0a'; ctx.fillRect(bx-8,y-1,17,2);
+}
+/* a struck body blanches for a beat — the hit reads on the sprite itself */
+function withFlash(u,now,draw){
+  const on = u.flash && now-u.flash<160;
+  draw();
+  if(on){
+    ctx.save(); ctx.globalCompositeOperation='source-atop';
+    ctx.globalAlpha=.75*(1-(now-u.flash)/160);
+    ctx.fillStyle='#fff';
+    const vx=u.vx!==undefined?u.vx:u.col, vy=u.vy!==undefined?u.vy:u.row;
+    ctx.fillRect(pxOf(vx)-11,pyOf(vy)-2,22,TILE+4);
+    ctx.restore(); ctx.globalAlpha=1;
+  }
+}
+function drawTokens(now){
+  for(const e of S.enemies){
+    if(!e.alive) continue;
+    withFlash(e,now,()=>{
+      if(e.kind==='grunt') drawGrunt(e,now);
+      else if(e.kind==='archer') drawArcher(e,now);
+      else if(e.kind==='mage') drawMage(e,now);
+      else drawWarden(e,now);
+    });
+    // hp ticks — hovering a foe you can hit ghosts the ticks your blow would take,
+    // so you read the outcome as damage to its life, never as a number.
+    const hovered = hover && hover.col===e.col && hover.row===e.row && S.attackable.has(e);
+    const preview = hovered? Math.max(0,e.hp-heroDamageTo(e,'physical')) : e.hp;
+    const x=pxOf(e.vx!==undefined?e.vx:e.col)-e.maxHp, y=pyOf(e.vy!==undefined?e.vy:e.row)+2;
+    for(let i=0;i<e.maxHp;i++){
+      let col='rgba(255,255,255,.13)';
+      if(i<preview) col = e.boss?'#ff5c6a':FOE.trim;
+      else if(i<e.hp) col = 'rgba(240,207,138,.45)';     // about to be taken
+      ctx.fillStyle=col; ctx.fillRect(x+i*2,y,1.4,2);
+    }
+    if(e.poison>0){ ctx.fillStyle='#a86ede'; ctx.fillRect(x+e.maxHp*2+4,y,2,2); }
+  }
+  if(S.hero.hp>0) withFlash(S.hero,now,()=>drawHero(now));
+}
+
+/* ---------- effects ---------- */
+function addFx(o){ if(!o) return; o.t0=performance.now();
+  o.dur=o.dur||(o.type==='shot'||o.type==='bolt'?380:o.type==='flash'?260:900); effects.push(o); }
+function drawFx(now){
+  effects=effects.filter(e=>now-e.t0<e.dur);
+  for(const e of effects){
+    const p=(now-e.t0)/e.dur;
+    if(e.type==='num'){
+      const pop = p<.18? 1+(.18-p)*2.2 : 1;          // a quick punch, then drift
+      ctx.globalAlpha=Math.min(1,(1-p)*1.6);
+      ctx.font=`bold ${Math.round(9*pop)}px monospace`; ctx.textAlign='center';
+      const yy=cyr(e.row)-9-p*12;
+      ctx.fillStyle='rgba(0,0,0,.7)'; ctx.fillText(e.txt,cx(e.col)+1,yy+1);
+      ctx.fillStyle=e.col2; ctx.fillText(e.txt,cx(e.col),yy);
+      ctx.globalAlpha=1;
+    } else if(e.type==='blast'){
+      const bx=cx(e.col), by=cyr(e.row), a=1-p;
+      ctx.fillStyle=`rgba(111,212,122,${(a*.35).toFixed(2)})`;   // green core bloom
+      ctx.beginPath(); ctx.arc(bx,by,2+p*9,0,7); ctx.fill();
+      ctx.strokeStyle=`rgba(111,212,122,${a.toFixed(2)})`; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.arc(bx,by,2+p*11,0,7); ctx.stroke();
+      ctx.strokeStyle=`rgba(207,232,210,${(a*.7).toFixed(2)})`; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.arc(bx,by,1+p*6,0,7); ctx.stroke();
+      ctx.fillStyle=`rgba(111,212,122,${a.toFixed(2)})`;          // scattering motes
+      for(let i=0;i<5;i++){
+        const ang=i*1.257+p*2, r=p*13;
+        ctx.fillRect(bx+Math.cos(ang)*r-1,by+Math.sin(ang)*r-1,2,2);
+      }
+    } else if(e.type==='shot'){
+      const a=1-p, fx=cx(e.from.c), fy=cyr(e.from.r), tx=cx(e.to.c), ty=cyr(e.to.r);
+      ctx.strokeStyle=e.col.replace(')',`,${a})`).replace('#','rgba(');
+      ctx.strokeStyle=e.col; ctx.globalAlpha=a; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.moveTo(fx,fy); ctx.lineTo(tx,ty); ctx.stroke();
+      ctx.fillStyle=e.col;
+      ctx.fillRect(fx+(tx-fx)*p-1,fy+(ty-fy)*p-1,3,3); ctx.globalAlpha=1;
+    } else if(e.type==='bolt'){
+      const fx=cx(e.from.c),fy=cyr(e.from.r),tx=cx(e.to.c),ty=cyr(e.to.r);
+      ctx.globalAlpha=1-p; ctx.fillStyle='#a86ede';
+      for(let i=0;i<3;i++){
+        const q=Math.max(0,p-i*.08);
+        ctx.fillRect(fx+(tx-fx)*q-1.5,fy+(ty-fy)*q-1.5,3,3);
+      }
+      ctx.globalAlpha=1;
+    } else if(e.type==='ring'){
+      ctx.strokeStyle=e.col2; ctx.globalAlpha=1-p; ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.arc(cx(e.col),cyr(e.row),4+p*12,0,7); ctx.stroke(); ctx.globalAlpha=1;
+    }
+  }
+  const fl=effects.find(e=>e.type==='flash');
+  if(fl){ const p=(now-fl.t0)/fl.dur;
+    ctx.fillStyle=`rgba(255,60,80,${(.28*(1-p)).toFixed(2)})`; ctx.fillRect(0,0,W,H); }
+}
+function initParticles(){
+  particles=[]; for(let i=0;i<34;i++) particles.push({
+    x:Math.random()*W,y:BY+Math.random()*(H-BY),
+    vx:(Math.random()-.5)*.08,vy:-0.05-Math.random()*0.08,
+    a:.05+Math.random()*.14,warm:Math.random()<.35});
+}
+function drawParticles(){
+  for(const p of particles){
+    p.x+=p.vx; p.y+=p.vy;
+    if(p.y<BY-2){p.y=H;p.x=Math.random()*W;}
+    if(p.x<0)p.x=W; if(p.x>W)p.x=0;
+    ctx.fillStyle=p.warm?`rgba(240,207,138,${p.a})`:`rgba(84,219,214,${p.a})`;
+    ctx.fillRect(p.x|0,p.y|0,1,1);
+  }
+}
+let vig=null;
+function drawVignette(){
+  if(!vig){ vig=ctx.createRadialGradient(W/2,H/2,40,W/2,H/2,190);
+    vig.addColorStop(0,'rgba(0,0,0,0)'); vig.addColorStop(1,'rgba(4,2,10,.66)'); }
+  ctx.fillStyle=vig; ctx.fillRect(0,0,W,H);
+}
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+function frame(now){
+  ctx.clearRect(0,0,W,H);
+  let ox=0,oy=0;
+  if(shakeAmt>0.05 && !reduceMotion){
+    ox=(Math.random()-.5)*shakeAmt*2; oy=(Math.random()-.5)*shakeAmt*2;
+  }
+  shakeAmt*=0.82;
+  ctx.save(); ctx.translate(Math.round(ox),Math.round(oy));
+  ctx.drawImage(bg,0,0);
+  drawBoard(now); drawTokens(now); drawFx(now); drawParticles();
+  ctx.restore();
+  drawVignette();
+  raf=requestAnimationFrame(frame);
+}
+
+/* ============================ INPUT ============================ */
+function pointToTile(ev){
+  const rect=cv.getBoundingClientRect();
+  const x=(ev.clientX-rect.left)/rect.width*W, y=(ev.clientY-rect.top)/rect.height*H;
+  const c=Math.floor((x-BX)/TILE), r=Math.floor((y-BY)/TILE);
+  return inB(c,r)?{col:c,row:r}:null;
+}
+cv.addEventListener('mousemove',e=>hover=pointToTile(e));
+cv.addEventListener('mouseleave',()=>hover=null);
+cv.addEventListener('click',ev=>{
+  if(S.over){ restart(); return; }
+  if(S.phase!=='player') return;
+  const t=pointToTile(ev); if(!t) return;
+  const e=enemyAt(t.col,t.row);
+  if(e&&S.attackable.has(e)){ playerStrike(e,'physical'); return; }
+  playerStep(t.col,t.row);
+});
+document.getElementById('curtain').addEventListener('click',restart);
+document.getElementById('btnEnd').onclick=endTurn;
+document.getElementById('btnRestart').onclick=restart;
+document.getElementById('btnBolt').onclick=()=>{
+  const tgt=[...S.enemies].filter(e=>e.alive&&cheb(S.hero,e)<=Math.max(2,heroRange()))
+    .sort((a,b)=>a.hp-b.hp)[0];
+  if(!tgt){ say('nothing within the bolt’s reach.'); return; }
+  playerStrike(tgt,'magic');
+};
+window.addEventListener('keydown',ev=>{
+  const k=ev.key.toLowerCase();
+  if(k==='r'){ restart(); return; }
+  if(S.over||S.phase!=='player') return;
+  if(k===' '||k==='enter'){ ev.preventDefault(); endTurn(); return; }
+  let dc=0,dr=0;
+  if(k==='w'||k==='arrowup')dr=-1; else if(k==='s'||k==='arrowdown')dr=1;
+  else if(k==='a'||k==='arrowleft')dc=-1; else if(k==='d'||k==='arrowright')dc=1;
+  else return;
+  ev.preventDefault();
+  playerStep(S.hero.col+dc,S.hero.row+dr);
+});
+
+/* ============================ BOOT ============================ */
+function restart(){
+  S=newRun(); pendingPick=null; pinned=null; taught={};
+  document.getElementById('draft').className='curtain';
+  document.getElementById('curtain').className='curtain';
+  loadFloor(0);
+}
+buildBg(); initParticles(); restart();
+cancelAnimationFrame(raf); raf=requestAnimationFrame(frame);
+
+/* Dev/playtest hooks — handy for demoing a specific floor or tuning numbers:
+   __game.jump(6) loads the boss floor; __game.give('bow') grants a skill. */
+window.__game={ get S(){return S}, calcDamage, heroProfile, SKILLS, KINDS, FLOORS,
+  jump:i=>loadFloor(Math.max(0,Math.min(FLOORS.length-1,i))),
+  give:id=>{ if(SKILLS[id]&&!S.hero.skills.includes(id)){ S.hero.skills.push(id);
+    renderSlots(); updateHud(); } } };
+})();
+</script>
