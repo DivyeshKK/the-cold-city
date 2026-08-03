@@ -85,8 +85,29 @@
   .card .ds{font-size:9.5px;line-height:1.5;color:var(--dim);text-transform:none;
     letter-spacing:.02em}
   .card .tag{display:inline-block;margin-top:6px;font-size:8px;letter-spacing:.14em;
-    padding:2px 5px;border:1px solid var(--edge);color:var(--faint);text-transform:uppercase}
+    padding:2px 5px;border:1px solid var(--edge);color:var(--dim);text-transform:uppercase}
   .card .tag.act{color:var(--purple);border-color:rgba(168,110,222,.4)}
+  .card .tag.swap{color:var(--gold);border-color:rgba(240,201,135,.45)}
+
+  /* draft screen: your condition stays on screen while you choose */
+  .draftStatus{display:flex;gap:16px;justify-content:center;align-items:center;
+    margin-bottom:10px;font-size:9px;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--dim);flex-wrap:wrap}
+  .draftStatus .grp{display:flex;align-items:center;gap:5px}
+  .draftStatus .pips{display:flex;gap:2px}
+  .draftStatus .num{color:var(--ink);font-weight:600}
+  .draftWarn{margin:0 auto 12px;max-width:520px;padding:7px 12px;
+    border:1px solid rgba(240,201,135,.5);background:rgba(240,201,135,.09);
+    color:var(--gold);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;
+    line-height:1.6;display:none}
+  .draftWarn.show{display:block}
+  .draftOwned{margin-top:12px;font-size:8.5px;letter-spacing:.13em;
+    text-transform:uppercase;color:var(--faint);line-height:1.8;max-width:560px;
+    margin-left:auto;margin-right:auto}
+  .draftOwned b{color:var(--dim);font-weight:600}
+  button.skip{margin-top:12px;font-size:9px;letter-spacing:.16em;
+    border-color:rgba(203,185,220,.2);color:var(--dim);padding:8px 14px}
+  button.skip:hover{border-color:var(--cyan);color:#fff}
 
   .bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
   button{font-family:inherit;font-size:10px;letter-spacing:.16em;text-transform:uppercase;
@@ -178,7 +199,11 @@
       <div>
         <div class="draftTitle" id="draftTitle">FLOOR CLEARED — CHOOSE A SKILL</div>
         <div class="draftSub" id="draftSub">One of three. You may carry five.</div>
+        <div class="draftStatus" id="draftStatus"></div>
+        <div class="draftWarn" id="draftWarn"></div>
         <div class="cards" id="cards"></div>
+        <div class="draftOwned" id="draftOwned"></div>
+        <button class="skip" id="btnSkip">Keep what I have — take nothing</button>
       </div>
     </div>
 
@@ -193,9 +218,7 @@
   <div class="bar">
     <span id="strikeBtns" class="strikeRow"></span>
     <button id="btnEnd">End Turn ␣</button>
-    <button id="btnBolt" title="Magic strike">Arcane Bolt</button>
-    <button id="btnAct1">—</button>
-    <button id="btnAct2">—</button>
+    <span id="actBtns" class="strikeRow"></span>
     <div class="spacer"></div>
     <button id="btnRestart">Restart Run</button>
   </div>
@@ -315,12 +338,18 @@ const BASE={ dmg:4, def:1, hp:10, mp:4, move:1, range:1 };
                hp(+max HP) mp(+max MP) range(+distance) mpCut(cost -1)
    kind: 'passive' | 'active'                                        */
 const SKILLS={
+  /* --- the two starter skills: one simple choice, nothing to weigh --- */
+  dmg_up:{cat:'BASIC',name:'Sharpen',kind:'passive',
+    ds:'+1 damage on every strike.',mod:{extra:1}},
+  def_up:{cat:'BASIC',name:'Harden',kind:'passive',
+    ds:'Take 1 less damage from every hit.',mod:{def:1}},
+
   power_strike:{cat:'ATTACK',name:'Power Strike',kind:'passive',
     ds:'+2 damage on every strike.',mod:{extra:2}},
-  quick_attack:{cat:'ATTACK',name:'Quick Attack',kind:'passive',
-    ds:'Act first: take one extra turn at the start of each battle.',flag:'initiative'},
+  quick_move:{cat:'ATTACK',name:'Quick Move',kind:'passive',
+    ds:'Move 2 tiles per turn instead of 1.',mod:{move:1}},
   double_slash:{cat:'ATTACK',name:'Double Slash',kind:'passive',
-    ds:'Strike twice, but basic damage is halved. Multiplies every flat bonus.',
+    ds:'Strike twice at half base damage. Your damage bonuses count on BOTH hits, so it grows with every +damage skill you own.',
     mod:{hits:1,halve:true}},
 
   shield_block:{cat:'DEFEND',name:'Shield Block',kind:'passive',
@@ -330,10 +359,24 @@ const SKILLS={
   magic_barrier:{cat:'DEFEND',name:'Magic Barrier',kind:'active',uses:1,
     ds:'Rebound the next magic attack back at its caster.'},
 
-  second_wind:{cat:'HEALING',name:'Second Wind',kind:'active',uses:1,
-    ds:'Regenerate 2 HP at the start of each of your next 5 rounds.'},
+  second_wind:{cat:'HEALING',name:'Second Wind',kind:'active',uses:1,mp:2,
+    ds:'Regenerate 2 HP at the start of each of your next 5 rounds. 2 MP.'},
   healing:{cat:'HEALING',name:'Healing',kind:'active',uses:1,mp:3,
-    ds:'Recover all HP. Costs 3 MP.'},
+    ds:'Recover all HP. 3 MP.'},
+
+  /* --- offensive actives: the answer when basic skills stop being enough --- */
+  fireball:{cat:'MAGIC',name:'Fireball',kind:'active',uses:3,mp:1,atk:true,
+    range:2,bonus:1,shape:'single',
+    ds:'Hurl fire at one foe up to 2 tiles away. +1 damage. 1 MP.'},
+  firerain:{cat:'MAGIC',name:'Fire Rain',kind:'active',uses:2,mp:3,atk:true,
+    range:2,bonus:2,shape:'aoe3',
+    ds:'Call fire onto a 3×3 area centred up to 2 tiles away. +2 damage to everything in it. 3 MP.'},
+  whirlwind:{cat:'ATTACK',name:'Whirlwind',kind:'active',uses:2,mp:2,atk:true,
+    range:1,bonus:2,shape:'around',
+    ds:'Sweep every foe adjacent to you. +2 damage. 2 MP.'},
+  slash:{cat:'ATTACK',name:'Slash',kind:'active',uses:2,mp:2,atk:true,
+    range:1,bonus:3,shape:'single',
+    ds:'A heavy blow on one adjacent foe. +3 damage. 2 MP.'},
 
   iron_sword:{cat:'GEAR',name:'Iron Sword',kind:'passive',
     ds:'+1 strike per attack, but basic damage is halved.',mod:{hits:1,halve:true}},
@@ -346,15 +389,37 @@ const SKILLS={
   knight_armor:{cat:'GEAR',name:'Knight Armor',kind:'passive',
     ds:'Maximum HP +2.',mod:{hp:2}},
 
-  arcane_bolt:{cat:'MAGIC',name:'Arcane Bolt',kind:'active',uses:3,mp:2,
-    ds:'Magic strike at distance 2 — ignores half the target’s defense. 2 MP.'},
-  magic_heart:{cat:'MAGIC',name:'Magic Heart',kind:'passive',
+  magic_heart:{cat:'GEAR',name:'Magic Heart',kind:'passive',
     ds:'Maximum MP +1.',mod:{mp:1}},
-  vitality:{cat:'MAGIC',name:'Essence of Vitality',kind:'passive',
+  vitality:{cat:'GEAR',name:'Essence of Vitality',kind:'passive',
     ds:'Maximum HP +2 and heal 2 now.',mod:{hp:2}},
-  whetstone:{cat:'GEAR',name:'Whetstone',kind:'passive',
-    ds:'+1 damage on every strike.',mod:{extra:1}},
 };
+
+/* which skills each level may offer — choices stay narrow early so the first
+   decisions are easy, and widen only once you understand the pieces */
+const POOLS={
+  basic:   ['dmg_up','def_up'],
+  actives1:['healing','fireball','whirlwind'],
+  actives2:['second_wind','firerain','slash'],
+  passive: ['power_strike','quick_move','double_slash','shield_block','dodge',
+            'magic_barrier','iron_sword','bow','magic_staff','armor',
+            'knight_armor','magic_heart','vitality'],
+};
+POOLS.all = [...POOLS.basic,...POOLS.actives1,...POOLS.actives2,...POOLS.passive];
+
+/* Buffs — picked 3-of-1 at the start of the marked levels, and they last
+   only for that level. */
+const BUFFS={
+  wind:     {name:'Freedom of Wind',       ds:'Move 1 extra tile each turn.'},
+  lightning:{name:'Swiftness of Lightning',ds:'Immune to ranged damage (halved from the boss).'},
+  fire:     {name:'Power of Fire',         ds:'+2 damage on every strike.'},
+  water:    {name:'Magic of Water',        ds:'Every MP cost reduced by 1.'},
+  endless:  {name:'Endless Battle',        ds:'No Second Wind or Healing — but +2 damage and +1 HP each round.'},
+  madness:  {name:'Madness',               ds:'+4 damage, but you take double damage.'},
+  whetstone:{name:'Whetstone',             ds:'+1 damage and +1 defence.'},
+  poison:   {name:'Poison Heart',          ds:'Your hits poison: 1 HP per round for 2 rounds. Stacks.'},
+};
+const BUFF_IDS=Object.keys(BUFFS);
 const SKILL_IDS=Object.keys(SKILLS);
 
 /* ============================ ENEMIES ============================ */
@@ -367,24 +432,55 @@ const KINDS={
 
 /* ============================ FLOORS ============================
    One new enemy type per floor; combinations only reuse known types. */
+/* Twelve levels. Each one teaches exactly one idea, and `pool` limits what the
+   draft may offer so early choices are small and legible. `pool:null` means no
+   draft at all. `buffs:true` opens a 3-of-1 buff pick BEFORE the fight. */
 const FLOORS=[
- {name:'TUTORIAL', tutorial:true,       // a teaching goon: 2 hits to fell, hits softly
-  enemies:[['goon',7,3,{hp:6,bd:2}]], walls:[[5,1],[5,2],[9,2]],
-  shrines:[[3,3]]},                    // sits on the approach, so it gets taught
- {name:'FLOOR 1',
+ {name:'LEVEL 0 — THE ROAD', tutorial:true, pool:null,
+  teach:'move', goal:[10,3],          // no foes: just walk to the far gate
+  enemies:[], walls:[[5,1],[5,2],[9,2]], shrines:[[3,3]]},
+
+ {name:'LEVEL 1 — FIRST BLOOD', tutorial2:true, pool:'basic',
+  teach:'fight',
+  enemies:[['goon',7,3,{hp:6,bd:2}]], walls:[[5,1],[5,2],[9,2]], shrines:[[3,3]]},
+
+ {name:'LEVEL 2', pool:'basic',
+  enemies:[['goon',8,3]], walls:[[5,1],[5,2],[6,4],[9,2]], shrines:[[3,5]]},
+
+ {name:'LEVEL 3', pool:'actives1',
   enemies:[['goon',7,2],['goon',8,4]], walls:[[5,1],[5,2],[6,4],[9,2]], shrines:[[3,5]]},
- {name:'FLOOR 2', intro:'sniper',   // a teaching archer: it stings, it doesn't execute
-  enemies:[['sniper',10,3,{hp:4,bd:3}]], walls:[[4,3],[4,2],[6,4],[7,1],[7,2],[9,4]],
-  shrines:[[2,1]]},
- {name:'FLOOR 3',
-  enemies:[['goon',6,1],['sniper',10,4]], walls:[[5,2],[6,4],[8,1],[9,2]], shrines:[[3,5],[8,5]]},
- {name:'FLOOR 4', intro:'mortar',
-  enemies:[['mortar',10,1]], walls:[[5,1],[5,2],[6,2],[6,4],[8,4],[9,2]], shrines:[[2,5]]},
- {name:'FLOOR 5',
-  enemies:[['goon',6,4],['sniper',11,2],['mortar',10,0]],
+
+ {name:'LEVEL 4', pool:'actives2',
+  enemies:[['goon',6,2],['goon',9,4]], walls:[[5,2],[6,4],[8,1],[9,2]], shrines:[[3,5],[8,5]]},
+
+ {name:'LEVEL 5', pool:'passive',
+  enemies:[['goon',6,1],['goon',8,3],['goon',9,5]],
+  walls:[[5,2],[6,4],[8,1],[9,2]], shrines:[[3,5],[8,5]]},
+
+ {name:'LEVEL 6', pool:'passive', intro:'mortar',
+  enemies:[['goon',6,3],['mortar',10,1]],
+  walls:[[5,1],[5,2],[6,2],[6,4],[8,4],[9,2]], shrines:[[2,5]]},
+
+ {name:'LEVEL 7', pool:'passive', intro:'sniper',
+  enemies:[['goon',6,1],['goon',7,4],['sniper',10,3]],
+  walls:[[4,3],[4,2],[6,4],[7,1],[7,2],[9,4]], shrines:[[2,1]]},
+
+ {name:'LEVEL 8', pool:'all',
+  enemies:[['goon',6,4],['mortar',10,0],['sniper',11,2]],
   walls:[[5,1],[5,2],[6,4],[8,1],[8,4],[9,2]], shrines:[[2,1],[3,5]]},
- {name:'FLOOR 6 — THE WARDEN', boss:true, intro:'warden',
-  enemies:[['warden',9,3],['goon',7,1]], walls:[[5,1],[5,4],[8,2],[8,4]], shrines:[[2,3]]},
+
+ {name:'LEVEL 9', pool:'all', buffs:true, warnBoss:true,
+  enemies:[['goon',6,1],['goon',7,5],['mortar',10,0],['mortar',11,4],['sniper',9,3]],
+  walls:[[5,1],[5,2],[6,4],[8,1],[8,4],[9,2]], shrines:[[2,1],[3,5],[2,4]]},
+
+ {name:'LEVEL 10', pool:'all',
+  enemies:[['goon',6,2],['goon',7,4],['mortar',10,0],['mortar',11,5],
+           ['sniper',9,1],['sniper',9,4]],
+  walls:[[5,1],[5,3],[6,5],[8,1],[8,4],[9,2]], shrines:[[2,1],[3,5],[2,3]]},
+
+ {name:'LEVEL 11 — THE WARDEN', boss:true, buffs:true, pool:null, intro:'warden',
+  enemies:[['warden',9,3],['goon',7,1],['goon',7,5]],
+  walls:[[5,1],[5,4],[8,2],[8,4]], shrines:[[2,3],[2,0]]},
 ];
 
 /* ============================ STATE ============================ */
@@ -402,7 +498,7 @@ function newRun(){
 
 /* --------- derived hero stats (base + skill mods) --------- */
 function mods(){
-  const m={extra:0,hits:1,halve:false,def:0,hp:0,mp:0,range:0,mpCut:0};
+  const m={extra:0,hits:1,halve:false,def:0,hp:0,mp:0,range:0,mpCut:0,move:0};
   for(const id of S.hero.skills){
     const k=SKILLS[id]; if(!k||!k.mod) continue;
     const d=k.mod;
@@ -414,7 +510,15 @@ function mods(){
     if(d.mp)    m.mp   +=d.mp;
     if(d.range) m.range+=d.range;
     if(d.mpCut) m.mpCut+=d.mpCut;
+    if(d.move)  m.move +=d.move;
   }
+  const b=S.hero.buffs||{};              // level buffs stack on top
+  if(b.fire)      m.extra+=2;
+  if(b.madness)   m.extra+=4;
+  if(b.whetstone){m.extra+=1; m.def+=1;}
+  if(b.endless)   m.extra+=2;
+  if(b.wind)      m.move +=1;
+  if(b.water)     m.mpCut+=1;
   return m;
 }
 const maxHp   = ()=>BASE.hp + mods().hp;
@@ -456,6 +560,7 @@ function loadFloor(i){
   S.floor=i; S.round=1; S.phase='player'; S.over=null;
   S.walls=new Set(F.walls.map(([c,r])=>key(c,r)));
   S.shrines=new Set((F.shrines||[]).map(([c,r])=>key(c,r)));
+  S.goal=F.goal||null;
   S.enemies=F.enemies.map(([kind,c,r,over],n)=>{
     const K={...KINDS[kind],...(over||{})};      // per-floor stat overrides
     return {kind,name:K.name,col:c,row:r,hp:K.hp,maxHp:K.hp,bd:K.bd,def:K.def,
@@ -475,9 +580,12 @@ function loadFloor(i){
   say(F.tutorial? 'you enter the district. the city hums, indifferent.'
                 : `${F.name.toLowerCase()} — the light shifts.`);
   if(F.intro) say(introLine(F.intro));
-  tut = F.tutorial ? {step:0} : null;
-  beginPlayerTurn();
+  tut = (F.tutorial||F.tutorial2) ? {step:0,mode:F.teach||'move'} : null;
   renderSlots(); updateHud();
+  // a blessing is chosen before the fight begins, not after
+  if(F.buffs){ document.getElementById('btnSkip').onclick=skipDraft;
+    openBuffPick(()=>{ beginPlayerTurn(); updateHud(); }); }
+  else beginPlayerTurn();
 }
 function introLine(k){
   return { sniper:'a sniper holds the far side. it will keep its distance.',
@@ -508,7 +616,7 @@ function losClear(a,b){
   return true;
 }
 function computeReach(){
-  const h=S.hero, budget=(h.moved?0:BASE.move+(h.buffs.wind?1:0));
+  const h=S.hero, budget=(h.moved?0:BASE.move+mods().move);
   const reach=new Map();
   if(budget>0){
     const dist=new Map([[key(h.col,h.row),0]]); const q=[[h.col,h.row]];
@@ -576,7 +684,11 @@ function endEnemyPhase(){
   if(S.over) return;
   tickPoison();
   if(S.over) return;
-  for(const k in S.hero.buffs) if(--S.hero.buffs[k]<=0) delete S.hero.buffs[k];
+  if(S.hero.buffs.endless) heal(1,'endless battle');   // +1 HP each round
+  // level blessings sit at 999 and last the whole level; timed pickups tick down
+  for(const k in S.hero.buffs){
+    if(S.hero.buffs[k]<900 && --S.hero.buffs[k]<=0) delete S.hero.buffs[k];
+  }
   S.round++;
   beginPlayerTurn();
 }
@@ -595,6 +707,10 @@ function playerStep(c,r){
   if(!S.reach.has(key(c,r))) return;
   h.col=c; h.row=r; h.moved=true;
   if(S.shrines.has(key(c,r))) takeShrine(key(c,r));
+  if(S.goal && c===S.goal[0] && r===S.goal[1]){    // reached the gate
+    addFx({type:'ring',col:c,row:r,col2:'rgba(240,201,135,.9)'});
+    clearFloor(); return;
+  }
   if(tut) tut.moved=true;
   maybeEndTurn();
 }
@@ -774,37 +890,115 @@ function takeShrine(k){
 function clearFloor(){
   S.phase='clear';
   if(S.floor>=FLOORS.length-1){ win(); return; }
-  say('the floor is quiet. something is learned.');
+  const F=FLOORS[S.floor];
+  say(F.enemies.length? 'the level is quiet. something is learned.'
+                      : 'the way opens.');
+  // levels with no pool (the opening road, the boss) hand you nothing
+  if(!F.pool){ setTimeout(()=>{ closeDraft(); },520); return; }
   setTimeout(openDraft,420);
 }
+/* Offer only what this level's pool allows, and never something you already
+   carry — so a draft is a small, readable decision rather than a menu. */
 function pick3(){
-  const owned=S.hero.skills;
-  let pool=SKILL_IDS.filter(id=>!owned.includes(id));
-  if(pool.length<3) pool=SKILL_IDS.slice();
+  const F=FLOORS[S.floor], owned=S.hero.skills;
+  const src = POOLS[F.pool] || POOLS.all;
+  let pool = src.filter(id=>!owned.includes(id));
+  if(!pool.length) pool = src.slice();
   const out=[];
-  while(out.length<3&&pool.length){
+  const n=Math.min(3,pool.length);
+  while(out.length<n&&pool.length){
     out.push(pool.splice(Math.floor(Math.random()*pool.length),1)[0]);
   }
   return out;
 }
 let pendingPick=null;
+/* Your HP/MP stay on screen while you choose — testers asked "how much health
+   do I have?" mid-draft. And if you're full, that is said BEFORE you pick,
+   not after, so replacement is never a surprise. */
+function drawDraftStatus(){
+  const h=S.hero, el=document.getElementById('draftStatus');
+  const pip=(n,max,cls)=>{let s='';
+    for(let i=0;i<max;i++) s+=`<div class="pip${cls?' '+cls:''}${i<n?'':' off'}"></div>`;
+    return `<div class="pips">${s}</div>`;};
+  el.innerHTML =
+    `<div class="grp">HP ${pip(h.hp,maxHp())} <span class="num">${h.hp}/${maxHp()}</span></div>`+
+    `<div class="grp">MP ${pip(h.mp,maxMp(),'mp')} <span class="num">${h.mp}/${maxMp()}</span></div>`+
+    `<div class="grp">SKILLS <span class="num">${h.skills.length}/5</span></div>`;
+}
 function openDraft(){
   const ids=pick3(), full=S.hero.skills.length>=5;
   const box=document.getElementById('cards'); box.innerHTML='';
   document.getElementById('draftTitle').textContent =
-    (S.floor===0?'TUTORIAL CLEARED':'FLOOR CLEARED')+' — CHOOSE A SKILL';
+    'LEVEL '+S.floor+' CLEARED — CHOOSE A SKILL';
   document.getElementById('draftSub').textContent =
-    full? 'You carry five. Choosing one will replace a skill.'
-        : `One of three. You carry ${S.hero.skills.length} of 5.`;
+    full? 'Your slots are full.' : `Pick one, or keep what you have.`;
+  drawDraftStatus();
+
+  const warn=document.getElementById('draftWarn');
+  warn.className = full? 'draftWarn show' : 'draftWarn';
+  if(full) warn.innerHTML =
+    'You already carry 5 skills — <b>taking any of these means giving one up.</b> '+
+    'You can also keep what you have.';
+
   for(const id of ids){
     const k=SKILLS[id];
     const b=document.createElement('button'); b.className='card';
     b.innerHTML=`<div class="cat">${k.cat}</div><div class="nm">${k.name}</div>
       <div class="ds">${k.ds}</div>
-      <span class="tag ${k.kind==='active'?'act':''}">${k.kind}${k.uses?` · ${k.uses}/battle`:''}${k.mp?` · ${k.mp} MP`:''}</span>`;
+      <span class="tag ${k.kind==='active'?'act':''}">${k.kind}${k.uses?` · ${k.uses}/battle`:''}${k.mp?` · ${k.mp} MP`:''}</span>
+      ${full?'<span class="tag swap">replaces a skill</span>':''}`;
     b.onclick=()=>chooseSkill(id);
     box.appendChild(b);
   }
+  // what you're already carrying, so you can compare without remembering
+  const owned=document.getElementById('draftOwned');
+  owned.innerHTML = S.hero.skills.length
+    ? 'You carry: '+S.hero.skills.map(i=>`<b>${SKILLS[i].name}</b>`).join(' · ')
+    : '';
+  document.getElementById('btnSkip').textContent =
+    full? 'Keep my 5 — take nothing' : 'Keep what I have — take nothing';
+  document.getElementById('draft').className='curtain show';
+}
+function skipDraft(){
+  say('you take nothing. the road is enough.');
+  pendingPick=null; closeDraft();
+}
+
+/* Buffs — 3-of-1 before the marked levels, lasting only that level. */
+function openBuffPick(after){
+  const pool=BUFF_IDS.slice(); const ids=[];
+  while(ids.length<3&&pool.length)
+    ids.push(pool.splice(Math.floor(Math.random()*pool.length),1)[0]);
+  const box=document.getElementById('cards'); box.innerHTML='';
+  document.getElementById('draftTitle').textContent='CHOOSE A BLESSING';
+  document.getElementById('draftSub').textContent=
+    'It lasts for this level only.';
+  drawDraftStatus();
+  const warn=document.getElementById('draftWarn');
+  warn.className='draftWarn show';
+  warn.innerHTML = FLOORS[S.floor].warnBoss
+    ? 'The road narrows. <b>The Warden waits two levels on.</b>'
+    : 'The Warden stands before you. Choose well.';
+  document.getElementById('draftOwned').innerHTML='';
+  for(const id of ids){
+    const b=BUFFS[id];
+    const el=document.createElement('button'); el.className='card';
+    el.innerHTML=`<div class="cat">BLESSING</div><div class="nm">${b.name}</div>
+      <div class="ds">${b.ds}</div><span class="tag act">this level only</span>`;
+    el.onclick=()=>{
+      S.hero.buffs[id]=999;                 // cleared when the level ends
+      say(`${b.name.toLowerCase()} settles over you.`);
+      document.getElementById('draft').className='curtain';
+      updateHud(); after&&after();
+    };
+    box.appendChild(el);
+  }
+  document.getElementById('btnSkip').textContent='Take no blessing';
+  document.getElementById('btnSkip').onclick=()=>{
+    document.getElementById('draft').className='curtain';
+    document.getElementById('btnSkip').onclick=skipDraft;
+    after&&after();
+  };
   document.getElementById('draft').className='curtain show';
 }
 function chooseSkill(id){
@@ -813,14 +1007,20 @@ function chooseSkill(id){
 }
 function promptReplace(){
   const box=document.getElementById('cards'); box.innerHTML='';
-  document.getElementById('draftTitle').textContent='REPLACE WHICH SKILL?';
+  document.getElementById('draftTitle').textContent='GIVE UP WHICH SKILL?';
   document.getElementById('draftSub').textContent=
-    `${SKILLS[pendingPick].name} will take its place.`;
+    `${SKILLS[pendingPick].name} takes its place.`;
+  drawDraftStatus();
+  const warn=document.getElementById('draftWarn');
+  warn.className='draftWarn show';
+  warn.innerHTML=`Taking <b>${SKILLS[pendingPick].name}</b> — choose the one it replaces. `+
+    `This is permanent.`;
+  document.getElementById('draftOwned').innerHTML='';
   for(const id of S.hero.skills){
     const k=SKILLS[id];
     const b=document.createElement('button'); b.className='card';
     b.innerHTML=`<div class="cat">${k.cat}</div><div class="nm">${k.name}</div>
-      <div class="ds">${k.ds}</div><span class="tag">discard</span>`;
+      <div class="ds">${k.ds}</div><span class="tag swap">give this up</span>`;
     b.onclick=()=>{
       S.hero.skills=S.hero.skills.filter(x=>x!==id);
       say(`you set aside ${k.name.toLowerCase()}.`);
@@ -828,6 +1028,8 @@ function promptReplace(){
     };
     box.appendChild(b);
   }
+  // backing out of a replacement is always allowed
+  document.getElementById('btnSkip').textContent='Change my mind — keep my 5';
 }
 function grant(id){
   S.hero.skills.push(id);
@@ -869,40 +1071,56 @@ function showCurtain(res,poem){
 
 /* ============================ TUTORIAL BUBBLES ============================
    One idea per beat, anchored to the thing it describes, gated on the action. */
-const TUT=[
+/* Level 0 teaches only movement; Level 1 only fighting. One idea per level. */
+const TUT_MOVE=[
  {txt:'You. The pilgrim.', go:'Click a glowing tile to step', at:'hero',
   done:()=>tut.moved},
  {txt:'A shrine.', go:'Step onto the diamond', at:'shrine',
   done:()=>S.shrines.size===0},
- {txt:'Shrines give you something — a heal, or an edge.', at:'hero', ttl:3000,
-  done:()=>{const e=S.enemies.find(x=>x.alive); return e&&cheb(S.hero,e)<=heroRange();}},
+ {txt:'Shrines give you something — a heal, or an edge.', at:'hero', ttl:2800,
+  done:()=>false},
+ {txt:'Now walk to the gate.', go:'Cross to the far side', at:'goal',
+  done:()=>false},
+];
+const TUT_FIGHT=[
  {txt:'A goon. Close the gap.', go:'Step until you are beside it', at:'enemy',
   done:()=>{const e=S.enemies.find(x=>x.alive); return e&&cheb(S.hero,e)<=heroRange();}},
  {txt:'Strike it.', go:'Click the goon, or the Strike button', at:'enemy',
   done:()=>tut.struck},
  {txt:'It hits back. Finish it.', at:'enemy', ttl:2600,      // fades on its own
   done:()=>!S.enemies.some(e=>e.alive)},
+ {txt:'Clear a level and you earn a skill.', at:'hero', ttl:3000,
+  done:()=>false},
 ];
+const TUT=TUT_MOVE;   // replaced per level in tutorialCheck
 function tutorialCheck(){
   if(!tut){ renderBubbles([]); return; }
+  const SET = tut.mode==='fight' ? TUT_FIGHT : TUT_MOVE;
   const before=tut.step;
-  while(tut.step<TUT.length && TUT[tut.step].done()) tut.step++;
+  while(tut.step<SET.length && SET[tut.step].done()) tut.step++;
   if(tut.step!==before) tut.shownAt=performance.now();   // new beat, restart its clock
-  if(tut.step>=TUT.length){ renderBubbles([]); return; }
-  const s=TUT[tut.step];
+  if(tut.step>=SET.length){ renderBubbles([]); return; }
+  const s=SET[tut.step];
   if(!tut.shownAt) tut.shownAt=performance.now();
   // a timed beat never parks on screen — it says its piece and gets out of the way
-  if(s.ttl && performance.now()-tut.shownAt>s.ttl){ renderBubbles([]); return; }
-  if(s.ttl) setTimeout(()=>{ if(tut&&tut.step===TUT.indexOf(s)) tutorialCheck(); }, s.ttl+30);
+  if(s.ttl && performance.now()-tut.shownAt>s.ttl){
+    if(tut.step<SET.length-1){ tut.step++; tut.shownAt=performance.now(); }
+    else { renderBubbles([]); return; }
+  }
+  const cur=SET[tut.step];
+  if(cur.ttl) setTimeout(()=>{ if(tut) tutorialCheck(); }, cur.ttl+40);
   let c,r;
-  if(s.at==='hero'){ c=S.hero.col; r=S.hero.row; }
-  else if(s.at==='shrine'){
+  if(cur.at==='hero'){ c=S.hero.col; r=S.hero.row; }
+  else if(cur.at==='shrine'){
     const k=[...S.shrines][0];
     if(!k){ c=S.hero.col; r=S.hero.row; }
     else { [c,r]=k.split(',').map(Number); }
   }
+  else if(cur.at==='goal'){
+    if(S.goal){ c=S.goal[0]; r=S.goal[1]; } else { c=S.hero.col; r=S.hero.row; }
+  }
   else { const e=S.enemies.find(x=>x.alive)||S.hero; c=e.col; r=e.row; }
-  renderBubbles([{c,r,txt:s.txt,go:s.go}]);
+  renderBubbles([{c,r,txt:cur.txt,go:cur.go}]);
 }
 function renderBubbles(list){
   const box=document.getElementById('bubbles');
@@ -994,23 +1212,71 @@ function updateHud(){
   btnEnd.style.display = canHold? '' : 'none';
   btnEnd.textContent = 'Hold — don’t strike ␣';
   btnEnd.disabled = !canHold;
-  const bolt=document.getElementById('btnBolt');
-  const owns=has('arcane_bolt');
-  bolt.style.display=owns?'':'none';
-  bolt.disabled=!playing||h.struck||h.mp<mpCost(2)||useLeft('arcane_bolt')<=0;
-  bolt.textContent=`Arcane Bolt (${useLeft('arcane_bolt')}) ${mpCost(2)}MP`;
-  const acts=S.hero.skills.filter(id=>SKILLS[id].kind==='active'&&id!=='arcane_bolt');
-  [1,2].forEach(i=>{
-    const el=document.getElementById('btnAct'+i), id=acts[i-1];
-    if(!id){ el.style.display='none'; return; }
-    el.style.display='';
-    const k=SKILLS[id], left=useLeft(id);
-    el.textContent=`${k.name} (${left})`;
-    el.disabled=!playing||left<=0||(k.mp&&h.mp<mpCost(k.mp))||
-      (id==='dodge'&&h.dodge)||(id==='magic_barrier'&&h.barrier);
-    el.onclick=()=>useActive(id);
-  });
+  // one button per active skill you carry, each showing uses left and MP cost
+  const actRow=document.getElementById('actBtns'); actRow.innerHTML='';
+  for(const id of S.hero.skills){
+    const k=SKILLS[id]; if(k.kind!=='active') continue;
+    const left=useLeft(id), cost=k.mp?mpCost(k.mp):0;
+    const el=document.createElement('button');
+    el.textContent=`${k.name} (${left})${cost?' '+cost+'MP':''}`;
+    if(S.aiming===id) el.className='strike';
+    el.disabled = !playing || left<=0 || (k.mp&&h.mp<cost) ||
+      (k.atk&&h.struck) || (id==='dodge'&&h.dodge) || (id==='magic_barrier'&&h.barrier) ||
+      (h.buffs.endless&&(id==='healing'||id==='second_wind'));
+    el.onclick=()=>startActive(id);
+    actRow.appendChild(el);
+  }
   renderSlots();
+}
+/* Offensive actives aim first: the board lights up with legal targets and the
+   next click commits. Everything else fires immediately. */
+function startActive(id){
+  const h=S.hero, k=SKILLS[id];
+  if(S.phase!=='player'||S.over) return;
+  if(useLeft(id)<=0) return;
+  if(k.mp&&h.mp<mpCost(k.mp)){ say('not enough magic for that.'); return; }
+  if(h.buffs.endless&&(id==='healing'||id==='second_wind')){
+    say('endless battle allows no mending.'); return; }
+  if(!k.atk){ useActive(id); return; }
+  if(h.struck) return;                       // one strike per turn
+  if(k.shape==='around'){ resolveActive(id,null); return; }
+  S.aiming=id; updateHud();
+}
+function aimRange(k){ return k.range + ((k.cat==='MAGIC'&&has('magic_staff'))?1:0); }
+function aimTiles(id){
+  const k=SKILLS[id], h=S.hero, out=[], rng=aimRange(k);
+  for(let c=0;c<COLS;c++) for(let r=0;r<ROWS;r++){
+    if(Math.max(Math.abs(c-h.col),Math.abs(r-h.row))>rng) continue;
+    if(isWall(c,r)) continue;
+    if(k.shape==='single'){ if(enemyAt(c,r)) out.push([c,r]); }
+    else out.push([c,r]);                    // an area may be centred anywhere
+  }
+  return out;
+}
+function resolveActive(id,tile){
+  const k=SKILLS[id], h=S.hero;
+  if(k.mp) h.mp-=mpCost(k.mp);
+  spendUse(id); h.struck=true; S.aiming=null;
+  const p=heroProfile(k.cat==='MAGIC'?'magic':'physical');
+  p.extra += (k.bonus||0);
+  let targets;
+  if(k.shape==='around')      targets=S.enemies.filter(e=>e.alive&&cheb(h,e)<=1);
+  else if(k.shape==='aoe3')   targets=S.enemies.filter(e=>e.alive&&
+                                Math.abs(e.col-tile[0])<=1&&Math.abs(e.row-tile[1])<=1);
+  else { const e=enemyAt(tile[0],tile[1]); targets=e?[e]:[]; }
+  const tx=tile?tile[0]:h.col;
+  h.anim={t:performance.now(),kind:k.cat==='MAGIC'?'cast':'melee',dir:tx>=h.col?1:-1};
+  say(`${k.name.toLowerCase()}!`);
+  if(tile) addFx({type:'ring',col:tile[0],row:tile[1],col2:'rgba(255,150,70,.95)'});
+  if(k.shape==='around')
+    addFx({type:'ring',col:h.col,row:h.row,col2:'rgba(255,150,70,.95)'});
+  for(const e of targets){
+    hurtEnemy(e,calcDamage({...p,def:e.def,vuln:e.vuln}));
+    if(h.buffs.poison) e.poison=(e.poison||0)+2;
+  }
+  if(!targets.length) say('it finds nothing.');
+  if(!S.enemies.some(x=>x.alive)){ clearFloor(); return; }
+  advance();
 }
 function useActive(id){
   const h=S.hero, k=SKILLS[id];
@@ -1087,6 +1353,17 @@ function drawBoard(now){
       if(inB(c,r)&&!isWall(c,r)) ctx.fillRect(tileX(c),tileY(r),TILE,TILE);
     }
   }
+  // the gate you walk to on a level with no foes
+  if(S.goal){
+    const [gc,gr]=S.goal, b=.5+.4*Math.sin(now/300);
+    ctx.strokeStyle=`rgba(240,201,135,${b.toFixed(2)})`; ctx.lineWidth=1;
+    ctx.strokeRect(tileX(gc)+2.5,tileY(gr)+2.5,TILE-5,TILE-5);
+    ctx.fillStyle=`rgba(240,201,135,${(b*.16).toFixed(2)})`;
+    ctx.fillRect(tileX(gc)+2,tileY(gr)+2,TILE-4,TILE-4);
+    ctx.fillStyle=`rgba(240,201,135,${b.toFixed(2)})`;
+    ctx.font='7px monospace'; ctx.textAlign='center';
+    ctx.fillText('EXIT',cx(gc),cyr(gr)+2.5);
+  }
   // shrines
   for(const k of S.shrines){
     const [c,r]=k.split(',').map(Number);
@@ -1120,8 +1397,25 @@ function drawBoard(now){
     ctx.strokeRect(tileX(c)+3.5,tileY(r)+3.5,TILE-7,TILE-7);
     ctx.beginPath();ctx.moveTo(x-6,y);ctx.lineTo(x+6,y);ctx.moveTo(x,y-6);ctx.lineTo(x,y+6);ctx.stroke();
   }
+  // aiming an active skill: legal tiles glow, and an area skill previews its blast
+  if(S.aiming&&S.phase==='player'&&!S.over){
+    const k=SKILLS[S.aiming], b=.45+.35*Math.sin(now/170);
+    for(const [c,r] of aimTiles(S.aiming)){
+      ctx.fillStyle=`rgba(255,150,70,${(b*.3).toFixed(2)})`;
+      ctx.fillRect(tileX(c)+1,tileY(r)+1,TILE-2,TILE-2);
+      ctx.strokeStyle=`rgba(255,150,70,${b.toFixed(2)})`; ctx.lineWidth=1;
+      ctx.strokeRect(tileX(c)+1.5,tileY(r)+1.5,TILE-3,TILE-3);
+    }
+    if(hover&&k.shape==='aoe3'){            // show the 3x3 it would cover
+      for(let dr=-1;dr<=1;dr++) for(let dc=-1;dc<=1;dc++){
+        const c=hover.col+dc,r=hover.row+dr; if(!inB(c,r)) continue;
+        ctx.fillStyle='rgba(255,90,60,.3)';
+        ctx.fillRect(tileX(c)+1,tileY(r)+1,TILE-2,TILE-2);
+      }
+    }
+  }
   // strikeable rings
-  if(S.phase==='player'&&!S.over){
+  if(S.phase==='player'&&!S.over&&!S.aiming){
     for(const e of S.attackable){
       const b=.5+.4*Math.sin(now/200);
       ctx.strokeStyle=`rgba(255,92,106,${b.toFixed(2)})`; ctx.lineWidth=1.5;
@@ -1380,6 +1674,12 @@ cv.addEventListener('click',ev=>{
   if(S.over){ restart(); return; }
   if(S.phase!=='player') return;
   const t=pointToTile(ev); if(!t) return;
+  if(S.aiming){                                     // committing an aimed skill
+    const ok=aimTiles(S.aiming).some(([c,r])=>c===t.col&&r===t.row);
+    if(ok) resolveActive(S.aiming,[t.col,t.row]);
+    else { S.aiming=null; say('you let the moment pass.'); updateHud(); }
+    return;
+  }
   const e=enemyAt(t.col,t.row);
   if(e&&S.attackable.has(e)){ playerStrike(e,'physical'); return; }
   playerStep(t.col,t.row);
@@ -1387,12 +1687,7 @@ cv.addEventListener('click',ev=>{
 document.getElementById('curtain').addEventListener('click',restart);
 document.getElementById('btnEnd').onclick=endTurn;
 document.getElementById('btnRestart').onclick=restart;
-document.getElementById('btnBolt').onclick=()=>{
-  const tgt=[...S.enemies].filter(e=>e.alive&&cheb(S.hero,e)<=Math.max(2,heroRange()))
-    .sort((a,b)=>a.hp-b.hp)[0];
-  if(!tgt){ say('nothing within the bolt’s reach.'); return; }
-  playerStrike(tgt,'magic');
-};
+document.getElementById('btnSkip').onclick=skipDraft;
 window.addEventListener('keydown',ev=>{
   const k=ev.key.toLowerCase();
   if(k==='r'){ restart(); return; }
@@ -1419,7 +1714,7 @@ cancelAnimationFrame(raf); raf=requestAnimationFrame(frame);
 /* Dev/playtest hooks — handy for demoing a specific floor or tuning numbers:
    __game.jump(6) loads the boss floor; __game.give('bow') grants a skill. */
 window.__game={ get S(){return S}, calcDamage, heroProfile, SKILLS, KINDS, FLOORS,
-  SPR, IMG,
+  SPR, IMG, POOLS, BUFFS, openDraft, openBuffPick,
   jump:i=>loadFloor(Math.max(0,Math.min(FLOORS.length-1,i))),
   give:id=>{ if(SKILLS[id]&&!S.hero.skills.includes(id)){ S.hero.skills.push(id);
     renderSlots(); updateHud(); } } };
