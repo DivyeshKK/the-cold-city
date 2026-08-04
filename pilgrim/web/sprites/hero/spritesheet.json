@@ -1,0 +1,123 @@
+{
+  "image": "spritesheet.png",
+  "frameWidth": 96,
+  "frameHeight": 42,
+  "anchor": {
+    "x": 47,
+    "y": 38,
+    "note": "foot centre / ground contact point, in frame-local pixels"
+  },
+  "frames": {
+    "idle_right_1": {
+      "x": 0,
+      "y": 0,
+      "w": 96,
+      "h": 42
+    },
+    "idle_right_2": {
+      "x": 96,
+      "y": 0,
+      "w": 96,
+      "h": 42
+    },
+    "idle_right_3": {
+      "x": 192,
+      "y": 0,
+      "w": 96,
+      "h": 42
+    },
+    "attack_crit_right": {
+      "x": 288,
+      "y": 0,
+      "w": 96,
+      "h": 42
+    },
+    "attack_spin_right": {
+      "x": 384,
+      "y": 0,
+      "w": 96,
+      "h": 42
+    },
+    "idle_left_1": {
+      "x": 0,
+      "y": 42,
+      "w": 96,
+      "h": 42
+    },
+    "idle_left_2": {
+      "x": 96,
+      "y": 42,
+      "w": 96,
+      "h": 42
+    },
+    "idle_left_3": {
+      "x": 192,
+      "y": 42,
+      "w": 96,
+      "h": 42
+    },
+    "attack_crit_left": {
+      "x": 288,
+      "y": 42,
+      "w": 96,
+      "h": 42
+    },
+    "attack_spin_left": {
+      "x": 384,
+      "y": 42,
+      "w": 96,
+      "h": 42
+    }
+  },
+  "animations": {
+    "idle_right": {
+      "frames": [
+        "idle_right_1",
+        "idle_right_2",
+        "idle_right_3"
+      ],
+      "fps": 8,
+      "loop": true
+    },
+    "idle_left": {
+      "frames": [
+        "idle_left_1",
+        "idle_left_2",
+        "idle_left_3"
+      ],
+      "fps": 8,
+      "loop": true
+    },
+    "attack_right": {
+      "frames": [
+        "attack_spin_right"
+      ],
+      "fps": 12,
+      "loop": false
+    },
+    "attack_left": {
+      "frames": [
+        "attack_spin_left"
+      ],
+      "fps": 12,
+      "loop": false
+    },
+    "attack_crit_right": {
+      "frames": [
+        "attack_crit_right"
+      ],
+      "fps": 12,
+      "loop": false
+    },
+    "attack_crit_left": {
+      "frames": [
+        "attack_crit_left"
+      ],
+      "fps": 12,
+      "loop": false
+    }
+  },
+  "overlays": {
+    "crit_text": "fx_crit_text.png"
+  }
+}
