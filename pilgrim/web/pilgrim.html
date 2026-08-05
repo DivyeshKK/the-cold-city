@@ -1,3 +1,4 @@
+<meta charset="utf-8">
 <title>THE COLD CITY — a pilgrimage combat slice</title>
 <style>
   :root{
@@ -59,9 +60,8 @@
   @keyframes pop{from{transform:translate(-50%,-92%) scale(.9);opacity:0}}
   @media(prefers-reduced-motion:reduce){.bubble{animation:none}}
 
-  /* the opening scene: a lone ramen stall */
-  .scene .sceneStage{font-size:26px;letter-spacing:.32em;margin-bottom:16px;
-    filter:saturate(.85)}
+  /* the opening scene: a lone ramen stall (drawn on the canvas, not typed) */
+  .scene .sceneStage{font-size:24px;letter-spacing:.3em;margin-bottom:14px}
   .scene .sceneWho{font-size:9px;letter-spacing:.28em;text-transform:uppercase;
     color:var(--gold);margin-bottom:8px}
   .scene .sceneLine{font-size:13px;line-height:1.85;color:var(--ink);
@@ -632,7 +632,7 @@ function loadFloor(i){
             alive:true,poison:0,vuln:0,anim:null,flash:0,n};
   });
   const h=S.hero;
-  S.gen++;                                      // invalidate any in-flight turn
+  S.gen++; S.resolving=false;                  // drop any in-flight turn
   h.col=1; h.row=3; h.vx=1; h.vy=3;             // don't slide in from the last floor
   h.moved=false; h.struck=false;
   h.mp=maxMp(); h.hp=Math.min(h.hp,maxHp());
@@ -730,22 +730,28 @@ function advance(){
     say('quick attack — you move again before they react.');
     beginPlayerTurn(); return;
   }
-  S.phase='enemy'; updateHud();
+  // Re-entering while a hand-over is already in flight orphans the timer chain
+  // and strands the game in the enemy phase — which is how you ended up unable
+  // to move after a kill. One hand-over at a time, with a watchdog to recover.
+  if(S.resolving) return;
+  S.resolving=true;
+  S.phase='enemy'; S.enemyPhaseAt=performance.now(); updateHud();
   const gen=S.gen;
   setTimeout(()=>{                          // let your own move land first
-    if(S.over||S.phase!=='enemy'||gen!==S.gen) return;
+    if(S.over||S.phase!=='enemy'||gen!==S.gen){ S.resolving=false; return; }
     // fixed order so ranged fire resolves before the melee press closes,
     // but all of it lands within the same visual beat
-    for(const e of S.enemies.filter(e=>e.alive&&e.ai==='kite'))  { sniperAct(e); if(S.over)return; }
-    for(const e of S.enemies.filter(e=>e.alive&&e.ai==='shell')) { mortarAct(e);   if(S.over)return; }
-    for(const e of S.enemies.filter(e=>e.alive&&e.ai==='chase')) { goonAct(e);  if(S.over)return; }
+    for(const e of S.enemies.filter(e=>e.alive&&e.ai==='kite'))  { sniperAct(e); if(S.over){S.resolving=false;return;} }
+    for(const e of S.enemies.filter(e=>e.alive&&e.ai==='shell')) { mortarAct(e);  if(S.over){S.resolving=false;return;} }
+    for(const e of S.enemies.filter(e=>e.alive&&e.ai==='chase')) { goonAct(e);   if(S.over){S.resolving=false;return;} }
     setTimeout(()=>{                        // let their movement finish easing
-      if(S.over||S.phase!=='enemy'||gen!==S.gen) return;
+      if(S.over||S.phase!=='enemy'||gen!==S.gen){ S.resolving=false; return; }
       endEnemyPhase();
     }, ENEMY_BEAT);
   }, PLAYER_BEAT);
 }
 function endEnemyPhase(){
+  S.resolving=false;
   if(S.over) return;
   tickPoison();
   if(S.over) return;
@@ -805,7 +811,7 @@ function playerStrike(e,type){
            : `you strike the ${e.name.toLowerCase()}.`);
   hurtEnemy(e,dmg);
   if(S.hero.buffs.poison) { e.poison=(e.poison||0)+3; say('poison takes root.'); }
-  if(!S.enemies.some(x=>x.alive)){ clearFloor(); return; }
+  if(!S.enemies.some(x=>x.alive)){ afterLastKill(); return; }
   if(tut) tut.struck=true;
   advance();                    // striking commits your turn — the city answers
 }
@@ -992,6 +998,16 @@ function clearFloor(){
   say('the last of them falls. the way out opens.');
   updateHud();
 }
+/* Killing the last foe used to hand you straight to the draft. Now that it only
+   unlocks the exit, the turn still has to resolve — otherwise the dead enemy
+   stays in `attackable` (a red ring on an empty tile) and your spent move is
+   never refunded, leaving you stuck. Give a clean turn to walk out on. */
+function afterLastKill(){
+  clearFloor();
+  if(S.over) return;
+  S.round++;
+  beginPlayerTurn();          // recomputes reach + clears the stale rings
+}
 /* Stepping through the open exit ends the level. */
 function leaveLevel(){
   S.phase='clear';
@@ -1090,6 +1106,10 @@ const GIFTS={
   speed:  {name:'Worn-in Boots',  ds:'Move 1 extra tile each turn, for the whole run.'},
 };
 let sceneStep=0, sceneTook=false;
+const sceneShowing=()=>{
+  const el=document.getElementById('scene');
+  return !!el && el.className.includes('show');
+};
 function openScene(){
   sceneStep=0; sceneTook=false;
   document.getElementById('scene').className='curtain scene show';
@@ -1447,7 +1467,7 @@ function resolveActive(id,tile){
     if(h.buffs.poison) e.poison=(e.poison||0)+2;
   }
   if(!targets.length) say('it finds nothing.');
-  if(!S.enemies.some(x=>x.alive)){ clearFloor(); return; }
+  if(!S.enemies.some(x=>x.alive)){ afterLastKill(); return; }
   advance();
 }
 function useActive(id){
@@ -1825,8 +1845,58 @@ function drawVignette(){
     vig.addColorStop(0,'rgba(0,0,0,0)'); vig.addColorStop(1,'rgba(4,2,10,.66)'); }
   ctx.fillStyle=vig; ctx.fillRect(0,0,W,H);
 }
+/* The opening scene gets a drawn set, not a typeface glyph: a shuttered street
+   with one lit stall. Same chunky pixels as everything else. */
+function drawStall(now){
+  const bx=Math.round(W/2), by=126;
+  ctx.fillStyle='rgba(6,3,12,.55)'; ctx.fillRect(0,BY-6,W,H-BY+6);   // dim street
+  // shuttered fronts either side, so the stall is the only lit thing
+  ctx.fillStyle='#0d0716';
+  ctx.fillRect(0,BY+2,bx-62,H-BY); ctx.fillRect(bx+62,BY+2,W-bx-62,H-BY);
+  // awning
+  ctx.fillStyle='#3d1130'; ctx.fillRect(bx-52,by-36,104,7);
+  ctx.fillStyle='#511640'; ctx.fillRect(bx-52,by-36,104,2);
+  ctx.fillStyle='#241430'; ctx.fillRect(bx-49,by-29,3,29); ctx.fillRect(bx+46,by-29,3,29);
+  // counter
+  ctx.fillStyle='#1b1026'; ctx.fillRect(bx-46,by,92,22);
+  ctx.fillStyle='#2c1b3c'; ctx.fillRect(bx-46,by,92,3);
+  // lantern, breathing
+  const g=.72+.28*Math.sin(now/430);
+  ctx.globalAlpha=g*.22; ctx.fillStyle='#ff7a4a';
+  ctx.beginPath(); ctx.arc(bx-33,by-19,15,0,7); ctx.fill();
+  ctx.globalAlpha=1;
+  ctx.fillStyle='#c2452c'; ctx.fillRect(bx-37,by-25,8,11);
+  ctx.fillStyle='#ff8a58'; ctx.globalAlpha=g; ctx.fillRect(bx-36,by-23,6,7);
+  ctx.globalAlpha=1;
+  ctx.fillStyle='#2a1a38'; ctx.fillRect(bx-34,by-29,2,4);
+  // the shopkeep behind the counter
+  ctx.fillStyle='#0f0918'; ctx.fillRect(bx+8,by-20,13,20);
+  ctx.fillRect(bx+10,by-26,9,7);
+  ctx.fillStyle='#3a2a4a'; ctx.fillRect(bx+9,by-14,11,2);
+  // two bowls and their steam
+  for(const ox of [-18,2]){
+    ctx.fillStyle='#e8dff2'; ctx.fillRect(bx+ox,by-5,9,4);
+    ctx.fillStyle='#b9a8cc'; ctx.fillRect(bx+ox,by-5,9,1);
+  }
+  for(let i=0;i<5;i++){
+    const t=((now/900)+i*0.2)%1, ox=(i%2?6:-14);
+    ctx.globalAlpha=(1-t)*.32; ctx.fillStyle='#d8cee8';
+    ctx.fillRect(bx+ox+Math.sin(t*6+i)*2, by-8-t*26, 2,2);
+  }
+  ctx.globalAlpha=1;
+}
+/* Timers are throttled hard in a background tab, so a turn hand-over can stall
+   with the player locked out. This runs off the animation loop, which resumes
+   the moment the tab is visible again, and hands the turn back. */
+function turnWatchdog(now){
+  if(!S||S.over||S.phase!=='enemy') return;
+  if(now-(S.enemyPhaseAt||now) < 2600) return;
+  S.resolving=false;
+  endEnemyPhase();
+}
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 function frame(now){
+  turnWatchdog(now);
   ctx.setTransform(1,0,0,1,0,0);
   ctx.clearRect(0,0,W*DPR,H*DPR);
   let ox=0,oy=0;
@@ -1839,7 +1909,9 @@ function frame(now){
   // everything below draws in 320x180 logical units on a 2x backing store
   ctx.setTransform(DPR,0,0,DPR,frameOffX,frameOffY);
   ctx.drawImage(bg,0,0);
-  drawBoard(now); drawTokens(now); drawFx(now); drawParticles();
+  if(sceneShowing()) drawStall(now);          // the opening set, not the board
+  else { drawBoard(now); drawTokens(now); drawFx(now); }
+  drawParticles();
   ctx.setTransform(DPR,0,0,DPR,0,0);
   drawVignette();
   raf=requestAnimationFrame(frame);
