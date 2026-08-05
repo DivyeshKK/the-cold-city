@@ -227,6 +227,7 @@
         <div class="sceneWho" id="sceneWho"></div>
         <div class="sceneLine" id="sceneLine"></div>
         <div class="sceneGo" id="sceneGo">SPACE / CLICK TO CONTINUE</div>
+        <button class="skip" id="btnSkipScene">Skip ahead</button>
         <div class="cards" id="sceneCards"></div>
       </div>
     </div>
@@ -399,52 +400,52 @@ const SKILLS={
   power_strike:{cat:'ATTACK',name:'Power Strike',kind:'passive',
     ds:'+2 damage on every strike.',mod:{extra:2}},
   quick_move:{cat:'ATTACK',name:'Quick Move',kind:'passive',
-    ds:'Move 2 tiles per turn instead of 1.',mod:{move:1}},
+    ds:'Move 2 tiles instead of 1.',mod:{move:1}},
   double_slash:{cat:'ATTACK',name:'Double Slash',kind:'passive',
-    ds:'Strike twice at half base damage. Your damage bonuses count on BOTH hits, so it grows with every +damage skill you own.',
+    ds:'Two strikes. Your damage bonuses count on both.',
     mod:{hits:1,halve:true}},
 
   shield_block:{cat:'DEFEND',name:'Shield Block',kind:'passive',
-    ds:'Incoming damage reduced by 2 (defense +2).',mod:{def:2}},
+    ds:'Take 2 less damage from every hit.',mod:{def:2}},
   dodge:{cat:'DEFEND',name:'Dodge',kind:'active',uses:1,
-    ds:'Ignore the next attack that would hit you.'},
+    ds:'Ignores the next blow.'},
   magic_barrier:{cat:'DEFEND',name:'Magic Barrier',kind:'active',uses:1,
-    ds:'Rebound the next magic attack back at its caster.'},
+    ds:'Throws the next spell back at its caster.'},
 
   second_wind:{cat:'HEALING',name:'Second Wind',kind:'active',uses:1,mp:2,
-    ds:'Regenerate 2 HP at the start of each of your next 5 rounds. 2 MP.'},
+    ds:'Heals 2 HP a round, for five rounds.'},
   healing:{cat:'HEALING',name:'Healing',kind:'active',uses:1,mp:3,
-    ds:'Recover all HP. 3 MP.'},
+    ds:'Heals you completely.'},
 
   /* --- offensive actives: the answer when basic skills stop being enough --- */
   fireball:{cat:'MAGIC',name:'Fireball',kind:'active',uses:3,mp:1,atk:true,
     range:2,bonus:1,shape:'single',
-    ds:'Hurl fire at one foe up to 2 tiles away. +1 damage. 1 MP.'},
+    ds:'Throws fire 2 tiles. +1 damage.'},
   firerain:{cat:'MAGIC',name:'Fire Rain',kind:'active',uses:2,mp:3,atk:true,
     range:2,bonus:2,shape:'aoe3',
-    ds:'Call fire onto a 3×3 area centred up to 2 tiles away. +2 damage to everything in it. 3 MP.'},
+    ds:'Fire falls on a 3×3 patch. +2 damage.'},
   whirlwind:{cat:'ATTACK',name:'Whirlwind',kind:'active',uses:2,mp:2,atk:true,
     range:1,bonus:2,shape:'around',
-    ds:'Sweep every foe adjacent to you. +2 damage. 2 MP.'},
+    ds:'Cuts every foe around you. +2 damage.'},
   slash:{cat:'ATTACK',name:'Slash',kind:'active',uses:2,mp:2,atk:true,
     range:1,bonus:3,shape:'single',
-    ds:'A heavy blow on one adjacent foe. +3 damage. 2 MP.'},
+    ds:'One heavy blow. +3 damage.'},
 
   iron_sword:{cat:'GEAR',name:'Iron Sword',kind:'passive',
-    ds:'+1 strike per attack, but basic damage is halved.',mod:{hits:1,halve:true}},
+    ds:'One extra strike. Half base damage.',mod:{hits:1,halve:true}},
   bow:{cat:'GEAR',name:'Bow',kind:'passive',
-    ds:'Attack distance +2. Lets you deal ranged damage.',mod:{range:2},grants:'ranged'},
+    ds:'Strike from 3 tiles away.',mod:{range:2},grants:'ranged'},
   magic_staff:{cat:'GEAR',name:'Magic Staff',kind:'passive',
-    ds:'Attack distance +1 and all MP costs reduced by 1.',mod:{range:1,mpCut:1},grants:'ranged'},
+    ds:'+1 range. Spells cost 1 less.',mod:{range:1,mpCut:1},grants:'ranged'},
   armor:{cat:'GEAR',name:'Armor',kind:'passive',
-    ds:'Incoming damage reduced by 1 (defense +1).',mod:{def:1}},
+    ds:'Take 1 less damage from every hit.',mod:{def:1}},
   knight_armor:{cat:'GEAR',name:'Knight Armor',kind:'passive',
     ds:'Maximum HP +2.',mod:{hp:2}},
 
   magic_heart:{cat:'GEAR',name:'Magic Heart',kind:'passive',
     ds:'Maximum MP +1.',mod:{mp:1}},
   vitality:{cat:'GEAR',name:'Essence of Vitality',kind:'passive',
-    ds:'Maximum HP +2 and heal 2 now.',mod:{hp:2}},
+    ds:'+2 max HP. Heals 2 now.',mod:{hp:2}},
 };
 
 /* which skills each level may offer — choices stay narrow early so the first
@@ -809,6 +810,8 @@ function playerStrike(e,type){
   const dmg=calcDamage({...p,def:e.def,vuln:e.vuln});
   say(magic? `your bolt breaks over the ${e.name.toLowerCase()}.`
            : `you strike the ${e.name.toLowerCase()}.`);
+  // blades glancing off heavy armour is the moment to mention the answer
+  if(!magic && e.def>=3 && dmg<=2) noteTrouble('glance');
   hurtEnemy(e,dmg);
   if(S.hero.buffs.poison) { e.poison=(e.poison||0)+3; say('poison takes root.'); }
   if(!S.enemies.some(x=>x.alive)){ afterLastKill(); return; }
@@ -942,6 +945,7 @@ function sniperAct(e){
            key:'sniper_shot',hit:'sniper_hit',dur:420});
     say(`the ${e.name.toLowerCase()} fires across the open ground.`);
     e.spent=true;                                 // must reload before firing again
+    noteTrouble('sniped');
     hurtHero(enemyHit(e),'arrow','physical',e);
   }
 }
@@ -954,6 +958,7 @@ function mortarAct(e){
   if(h.col===tc&&h.row===tr){
     const d=enemyHit(e,'magic');
     say('the shell finds you where you stood — your guard barely matters.');
+    noteTrouble('shelled');
     hurtHero(d,'shell','magic',e);
   } else say('a shell craters the ground you just left.');
 }
@@ -1123,9 +1128,11 @@ function drawScene(){
   const cards=document.getElementById('sceneCards');
   const go=document.getElementById('sceneGo');
   cards.innerHTML='';
-  if(s){ go.style.display=''; return; }          // still talking
+  const skipBtn=document.getElementById('btnSkipScene');
+  if(s){ go.style.display=''; if(skipBtn) skipBtn.style.display=''; return; }
   // out of lines: he lays out the three gifts
   go.style.display='none';
+  if(skipBtn) skipBtn.style.display='none';
   for(const id of ['offense','defense','speed']){
     const g=GIFTS[id];
     const b=document.createElement('button'); b.className='card';
@@ -1153,6 +1160,9 @@ function drawScene(){
 function advanceScene(){
   if(sceneStep<SCENE1.length){ sceneStep++; drawScene(); }
 }
+/* Nobody should be held at a wall of dialogue before they have touched the
+   game. Skipping jumps to the gift, which is the part that changes play. */
+function skipScene(){ sceneStep=SCENE1.length; drawScene(); }
 
 /* Buffs — 3-of-1 before the marked levels, lasting only that level. */
 function openBuffPick(after){
@@ -1338,6 +1348,20 @@ function teach(id,txt,go,x,y,ms=5200){
   pinned={txt,go,x,y};
   renderBubbles(null); tutorialCheck();
   setTimeout(()=>{ pinned=null; tutorialCheck(); }, ms);
+}
+/* Adaptive hints. These only ever reach a player who is actually struggling —
+   someone doing the right thing never sees them, and so is never talked down
+   to. Each fires once per run. */
+function nudge(id,txt,go){ teach(id,txt,go,50,64,4600); }
+function noteTrouble(kind){
+  const t=S.trouble||(S.trouble={});
+  t[kind]=(t[kind]||0)+1;
+  if(kind==='shelled' && t.shelled>=2)
+    nudge('t_shell','The shell lands where you last stood.','Step every turn');
+  if(kind==='sniped' && t.sniped>=3)
+    nudge('t_cover','Walls break its line of sight.','Advance behind cover');
+  if(kind==='glance' && t.glance>=3)
+    nudge('t_armour','Armour turns a single blade.','Magic, or more strikes');
 }
 
 /* ============================ HUD ============================ */
@@ -1970,8 +1994,9 @@ function restart(){
   document.getElementById('curtain').className='curtain';
   loadFloor(0);
 }
+document.getElementById('btnSkipScene').onclick=ev=>{ ev.stopPropagation(); skipScene(); };
 document.getElementById('scene').addEventListener('click',ev=>{
-  if(ev.target.closest('.card')) return;        // the gift cards handle themselves
+  if(ev.target.closest('.card')||ev.target.closest('button')) return;
   advanceScene();
 });
 buildBg(); initParticles(); restart();
@@ -1982,6 +2007,7 @@ cancelAnimationFrame(raf); raf=requestAnimationFrame(frame);
    __game.jump(6) loads the boss floor; __game.give('bow') grants a skill. */
 window.__game={ get S(){return S}, calcDamage, heroProfile, SKILLS, KINDS, FLOORS,
   SPR, IMG, POOLS, BUFFS, openDraft, openBuffPick, frame, drawBoard, drawTokens, drawFx,
+  noteTrouble,
   jump:i=>loadFloor(Math.max(0,Math.min(FLOORS.length-1,i))),
   give:id=>{ if(SKILLS[id]&&!S.hero.skills.includes(id)){ S.hero.skills.push(id);
     renderSlots(); updateHud(); } } };
