@@ -80,15 +80,18 @@ const BUILDS = {
 /* the band each level is *meant* to sit in */
 const INTENT = [
   'trivial', 'trivial', 'fair', 'fair', 'fair', 'fair',
-  'tense', 'tense', 'tense', 'brutal', 'brutal', 'brutal',
+  'tense', 'tense', 'tense', 'brutal', 'brutal', 'brutal', 'brutal',
 ];
 
 /* ---- the game's own damage formula, mirrored ---------------------------- */
+/* mirrors the game: a landed blow always draws at least MIN_DAMAGE, which is
+   what stops a stacked guard from making anyone immortal */
+const MIN_DAMAGE = 1;
 function damage({ basic, extra = 0, hits = 1, def = 0, type = 'physical', amp = 1, vuln = 0 }) {
   const d = type === 'magic' ? def * 0.5 : def;
   let raw = (basic + extra) * hits - d;
   if (raw < 0) raw = 0;
-  return Math.max(0, Math.floor(raw * amp * (1 + vuln)));
+  return Math.max(MIN_DAMAGE, Math.floor(raw * amp * (1 + vuln)));
 }
 
 const BAND = (p) =>
@@ -128,6 +131,9 @@ function analyse(level, i, buildFn) {
     const rate = f.ai === 'chase' ? 1.0                  // melee: every turn adjacent
                : f.ai === 'kite'  ? 0.5 * coverFactor    // reloads, and cover blocks
                : f.ai === 'shell' ? 0.15                 // only lands if you stand still
+               // the Lance telegraphs a turn ahead and fires every third turn,
+               // so a reader dodges most of it
+               : f.ai === 'lance' ? 0.12
                : 1.0;
     // turns before it reaches / ranges you (melee walks, shooters open fire early)
     const dist = Math.round(Math.hypot(f.col - 1, f.row - 3));
