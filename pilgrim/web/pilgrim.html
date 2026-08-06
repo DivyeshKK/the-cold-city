@@ -43,6 +43,8 @@
   .hud .math{position:absolute;bottom:8px;left:10px;color:var(--dim);
     font-size:12px;line-height:1.6;max-width:66%;letter-spacing:.08em}
   .hud .math b{color:var(--gold);font-weight:600}
+  .hud .math.gained{color:var(--gold);opacity:1;
+    text-shadow:0 0 8px rgba(240,201,135,.35)}
   .hud .phase{position:absolute;bottom:8px;right:10px;color:var(--cyan);font-size:13px;font-weight:600}
   .hud .phase.enemy{color:var(--magenta)}
 
@@ -679,6 +681,7 @@ function loadFloor(i){
   S.shrines=new Set((F.shrines||[]).map(([c,r])=>key(c,r)));
   S.goal=F.goal||null;
   S.scorched=new Map();
+  S.lastPickup=null;
   S.exitOpen = !F.enemies.length;        // an empty road is open from the start
   S.enemies=F.enemies.map(([kind,c,r,over],n)=>{
     const K={...KINDS[kind],...(over||{})};      // per-floor stat overrides
@@ -1120,7 +1123,9 @@ function takeShrine(k){
   const [c,r]=k.split(',').map(Number);
   addFx({type:'ring',col:c,row:r,col2:'#f0c987'});
   roll.f();
-  addFx({type:'pickup',col:c,row:r,name:roll.n.toUpperCase(),gain:roll.gain,dur:2000});
+  addFx({type:'pickup',col:c,row:r,name:roll.n.toUpperCase(),gain:roll.gain,dur:2600});
+  // and hold it in the HUD, because a float that fades is easy to miss entirely
+  S.lastPickup={name:roll.n.toUpperCase(),gain:roll.gain,round:S.round};
   say(`${roll.n.toLowerCase()} — ${roll.gain.toLowerCase()}`);
   updateHud();
 }
@@ -1193,6 +1198,7 @@ function walkToExit(){
 /* Stepping through the open exit ends the level. */
 function leaveLevel(){
   S.phase='clear';
+  startWipe();                                   // close the level out
   const F=FLOORS[S.floor];
   say('you step through.');
   if(!F.pool){ setTimeout(()=>{ closeDraft(); },520); return; }
@@ -1420,8 +1426,8 @@ function grant(id){
   S.hero.hp=Math.min(S.hero.hp,maxHp());
   // the first spell you own is the first time MP means anything — say so then
   if(k.mp) setTimeout(()=>teach('mp',
-    `The purple bar is magic. ${k.name} spends ${k.mp} of it.`,
-    'It refills at each new floor', 78, 30), 500);
+    `${k.name} costs magic. That is the purple bar — new, because you can now spend it.`,
+    'It refills each level', 76, 30, 6200), 520);
   if(k.kind==='active'&&!k.mp) setTimeout(()=>teach('active',
     'Active skills sit under the board. Limited uses each battle.',
     '', 50, 96), 500);
@@ -1590,7 +1596,13 @@ function updateHud(){
   document.getElementById('hRound').textContent='ROUND '+S.round;
   document.getElementById('hFoes').textContent='FOES · '+S.enemies.filter(e=>e.alive).length;
   pips(document.getElementById('hHp'),h.hp,maxHp(),'','HP');
-  pips(document.getElementById('hMp'),h.mp,maxMp(),'mp','MP');
+  /* MP stays hidden until the player owns something that spends it. A meter
+     that cannot move teaches nothing and invites "what even is that?" — it
+     appears at the moment it first means something. */
+  const usesMp = h.skills.some(id=>SKILLS[id]&&SKILLS[id].mp);
+  const mpEl=document.getElementById('hMp');
+  mpEl.style.display = usesMp? '' : 'none';
+  if(usesMp) pips(mpEl,h.mp,maxMp(),'mp','MP');
   const b=[];
   for(const k in h.buffs) b.push(k.toUpperCase()+(h.buffs[k]<90?'·'+h.buffs[k]:''));
   if(h.dodge) b.push('DODGE READY'); if(h.barrier) b.push('BARRIER');
@@ -1600,9 +1612,17 @@ function updateHud(){
   // No prompt text when a strike is offered — the pulsing button says it.
   const hint=document.getElementById('hMath');
   const offering = !S.over && S.phase==='player' && S.attackable.size>0;
-  hint.innerHTML = (S.over||S.phase==='enemy'||offering)? ''
-    : 'Click a glowing tile to step';
-  hint.className='math';
+  // what the last shrine gave you stays legible for a few rounds
+  const lp=S.lastPickup;
+  const freshPickup = lp && (S.round-lp.round)<=2 && !S.over;
+  if(freshPickup){
+    hint.innerHTML=`<b>${lp.name}</b> — ${lp.gain}`;
+    hint.className='math gained';
+  } else {
+    hint.innerHTML = (S.over||S.phase==='enemy'||offering)? ''
+      : 'Click a glowing tile to step';
+    hint.className='math';
+  }
 
   const ph=document.getElementById('hPhase');
   ph.textContent = S.over? (S.over==='win'?'DISTRICT CLEAR':'FALLEN')
@@ -2154,6 +2174,41 @@ function turnWatchdog(now){
   S.resolving=false;
   endEnemyPhase();
 }
+/* ---- level transition ----------------------------------------------------
+   A grey sweep closes the level from the right, but it arrives as a grid of
+   blocks rather than a clean edge: each column snaps in a beat after the last,
+   and each block within a column lands on its own small offset, so the wipe
+   tessellates in instead of sliding. Then it opens the same way on the far
+   side. Deliberately chunky, to match the rest of the rendering. */
+const WIPE_MS = 900;
+function startWipe(){ S.wipe={t0:performance.now()}; }
+function drawWipe(now){
+  if(!S.wipe) return;
+  const p=(now-S.wipe.t0)/WIPE_MS;
+  if(p>=1){ S.wipe=null; return; }
+  const B=10;                                   // block size in logical px
+  const cols=Math.ceil(W/B), rows=Math.ceil(H/B);
+  // 0 -> 1 closing, 1 -> 2 opening again
+  const closing = p<0.55;
+  const t = closing ? p/0.55 : 1-(p-0.55)/0.45;
+  for(let cx0=0;cx0<cols;cx0++){
+    // right-hand columns commit first
+    const colDelay=(1-cx0/cols)*0.55;
+    for(let ry=0;ry<rows;ry++){
+      // a per-block stagger so the edge is toothed, not straight
+      const jitter=(((cx0*7+ry*13)%5)/5)*0.16;
+      const local=(t-colDelay-jitter)/0.35;
+      if(local<=0) continue;
+      const a=Math.min(1,local);
+      ctx.fillStyle=`rgba(18,14,26,${a.toFixed(2)})`;
+      ctx.fillRect(cx0*B,ry*B,B,B);
+      if(a>0.35&&a<0.95){                       // a lit edge on the leading blocks
+        ctx.fillStyle=`rgba(120,110,140,${((0.95-a)*0.5).toFixed(2)})`;
+        ctx.fillRect(cx0*B,ry*B,B,1.5);
+      }
+    }
+  }
+}
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 function frame(now){
   turnWatchdog(now);
@@ -2174,6 +2229,7 @@ function frame(now){
   drawParticles();
   ctx.setTransform(DPR,0,0,DPR,0,0);
   drawVignette();
+  drawWipe(now);                                 // the level-change sweep
   raf=requestAnimationFrame(frame);
 }
 
