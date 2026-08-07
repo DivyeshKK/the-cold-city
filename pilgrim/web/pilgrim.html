@@ -87,8 +87,13 @@
   .poem{font-size:12px;letter-spacing:.18em;line-height:1.8;text-transform:uppercase;
     max-width:80%;margin:0 auto;color:var(--ink)}
   .curtain.win .poem{color:var(--gold)}
-  .again{margin-top:14px;font-size:9.5px;letter-spacing:.2em;color:var(--faint);
-    text-transform:uppercase}
+  .curtainActions{margin-top:14px;display:flex;flex-direction:column;gap:8px;align-items:center}
+  .again{font-size:9.5px;letter-spacing:.2em;color:var(--faint);text-transform:uppercase;
+    background:none;border:none;font-family:inherit;cursor:pointer;padding:2px 4px}
+  .again:hover,.again:focus-visible{color:var(--ink);outline:none}
+  .again.primary{color:var(--gold);font-size:10.5px;animation:softpulse 1.8s ease-in-out infinite}
+  .curtain.win #btnRetry{display:none}
+  @media(prefers-reduced-motion:reduce){.again.primary{animation:none}}
 
   /* skill draft */
   .draftTitle{font-size:11px;letter-spacing:.24em;text-transform:uppercase;
@@ -241,7 +246,10 @@
     <div class="curtain" id="curtain">
       <div>
         <div class="poem" id="poem"></div>
-        <div class="again" id="againTxt">CLICK OR PRESS R TO WALK AGAIN</div>
+        <div class="curtainActions">
+          <button class="again primary" id="btnRetry">RETRY THIS LEVEL</button>
+          <button class="again" id="btnRestartEnd">RESTART THE RUN</button>
+        </div>
       </div>
     </div>
   </div>
@@ -1102,9 +1110,9 @@ function mortarAct(e){
 /* Each shrine states plainly what it gave: a named banner on the tile plus the
    figure, because testers picked one up and could not tell what happened. */
 const SHRINE_ROLLS=[
-  {n:'Energy Drink', gain:'+4 HP  +2 MP',
+  {n:'Energy Drink', gain:'+4 HP  +2 MP', mp:true,
    f:()=>{healQuiet(4); S.hero.mp=Math.min(maxMp(),S.hero.mp+2);}},
-  {n:'Pure Water',   gain:'+4 MP',
+  {n:'Pure Water',   gain:'+4 MP', mp:true,
    f:()=>{S.hero.mp=Math.min(maxMp(),S.hero.mp+4);}},
   {n:'Cookies',      gain:'+8 HP', f:()=>healQuiet(8)},
   {n:'Power of Fire',gain:'+2 DAMAGE / 3 ROUNDS', f:()=>{S.hero.buffs.fire=3;}},
@@ -1118,7 +1126,10 @@ function healQuiet(n){          // the shrine banner reports the gain, not a flo
   S.hero.hp=Math.min(maxHp(),S.hero.hp+n);
 }
 function takeShrine(k){
-  const roll=SHRINE_ROLLS[Math.floor(Math.random()*SHRINE_ROLLS.length)];
+  // magic-flavoured rolls stay out of the pool until MP has actually been taught —
+  // a shrine should never be the place someone first hears the word.
+  const pool = mpKnown()? SHRINE_ROLLS : SHRINE_ROLLS.filter(r=>!r.mp);
+  const roll=pool[Math.floor(Math.random()*pool.length)];
   S.shrines.delete(k);
   const [c,r]=k.split(',').map(Number);
   addFx({type:'ring',col:c,row:r,col2:'#f0c987'});
@@ -1229,7 +1240,7 @@ function drawDraftStatus(){
     return `<div class="pips">${s}</div>`;};
   el.innerHTML =
     `<div class="grp">HP ${pip(h.hp,maxHp())} <span class="num">${h.hp}/${maxHp()}</span></div>`+
-    `<div class="grp">MP ${pip(h.mp,maxMp(),'mp')} <span class="num">${h.mp}/${maxMp()}</span></div>`+
+    (mpKnown()? `<div class="grp">MP ${pip(h.mp,maxMp(),'mp')} <span class="num">${h.mp}/${maxMp()}</span></div>` : '')+
     `<div class="grp">SKILLS <span class="num">${h.skills.length}/5</span></div>`;
 }
 function openDraft(){
@@ -1298,16 +1309,24 @@ const GIFTS={
   defense:{name:'A Padded Coat',  ds:'Take 1 less damage from every hit, for the whole run.'},
   speed:  {name:'Worn-in Boots',  ds:'Move 1 extra tile each turn, for the whole run.'},
 };
-let sceneStep=0, sceneTook=false;
+let sceneStep=0, sceneTook=false, sceneOnDone=null;
 const sceneShowing=()=>{
   const el=document.getElementById('scene');
   return !!el && el.className.includes('show');
 };
-function openScene(which,givesGift){
-  SCENE1=which||SCENE_ALL; sceneGivesGift=!!givesGift;
+// onDone fires once the scene actually closes — the next level is only ever
+// loaded from there, so the NPC is always met before anything renders behind him.
+function openScene(which,givesGift,onDone){
+  SCENE1=which||SCENE_ALL; sceneGivesGift=!!givesGift; sceneOnDone=onDone||null;
   sceneStep=0; sceneTook=false;
   document.getElementById('scene').className='curtain scene show';
   drawScene();
+}
+function closeScene(){
+  document.getElementById('scene').className='curtain scene';
+  const done=sceneOnDone; sceneOnDone=null;
+  updateHud();
+  done&&done();
 }
 function drawScene(){
   const s=SCENE1[sceneStep];
@@ -1319,10 +1338,7 @@ function drawScene(){
   cards.innerHTML='';
   if(s){ go.style.display=''; return; }
   go.style.display='none';
-  if(!sceneGivesGift){                       // the opening beat just ends
-    document.getElementById('scene').className='curtain scene';
-    updateHud(); return;
-  }
+  if(!sceneGivesGift){ closeScene(); return; }   // the opening beat just ends
   for(const id of ['offense','defense','speed']){
     const g=GIFTS[id];
     const b=document.createElement('button'); b.className='card';
@@ -1339,10 +1355,7 @@ function drawScene(){
       document.getElementById('sceneWho').textContent='Shopkeep';
       document.getElementById('sceneLine').textContent='“Thanks for your business.”';
       say(`the shopkeep hands you ${g.name.toLowerCase()}.`);
-      setTimeout(()=>{
-        document.getElementById('scene').className='curtain scene';
-        updateHud(); renderSlots();
-      },1100);
+      setTimeout(()=>{ closeScene(); renderSlots(); },1100);
     };
     cards.appendChild(b);
   }
@@ -1426,8 +1439,8 @@ function grant(id){
   S.hero.hp=Math.min(S.hero.hp,maxHp());
   // the first spell you own is the first time MP means anything — say so then
   if(k.mp) setTimeout(()=>teach('mp',
-    `${k.name} costs magic. That is the purple bar — new, because you can now spend it.`,
-    'It refills each level', 76, 30, 6200), 520);
+    `${k.name} costs MP — magic points. That's the new purple bar, and it's yours to spend now.`,
+    'Refills each level · shrines can top it up too', 76, 30, 7200), 520);
   if(k.kind==='active'&&!k.mp) setTimeout(()=>teach('active',
     'Active skills sit under the board. Limited uses each battle.',
     '', 50, 96), 500);
@@ -1436,13 +1449,15 @@ function grant(id){
 function closeDraft(){
   document.getElementById('draft').className='curtain';
   S.floor++; S.hero.hp=Math.min(maxHp(),S.hero.hp+3);   // a breath between floors
-  loadFloor(S.floor);
   // The Shopkeep comes back once you have three levels behind you — by then
-  // you are invested enough to sit through the rest of him.
+  // you are invested enough to sit through the rest of him. He's met BEFORE
+  // the next floor loads, never layered over a level that's already live.
   if(S.floor===2 && !S.metShopkeep){
     S.metShopkeep=true;
-    setTimeout(()=>openScene(SCENE_ALL,true),450);
+    openScene(SCENE_ALL,true,()=>loadFloor(S.floor));
+    return;
   }
+  loadFloor(S.floor);
 }
 
 /* ============================ END STATES ============================ */
@@ -1461,6 +1476,12 @@ function showCurtain(res,poem){
   c.className='curtain show '+res;
   document.getElementById('poem').textContent='“'+poem.toUpperCase()+'”';
 }
+// Dying loses the level, not the run — skills, gift, and floor all carry over.
+function retryLevel(){
+  document.getElementById('curtain').className='curtain';
+  say('you try again.');
+  loadFloor(S.floor);
+}
 
 /* ============================ TUTORIAL BUBBLES ============================
    One idea per beat, anchored to the thing it describes, gated on the action. */
@@ -1470,7 +1491,7 @@ const TUT_MOVE=[
   done:()=>tut.moved},
  {txt:'A shrine.', go:'Step onto the diamond', at:'shrine',
   done:()=>S.shrines.size===0},
- {txt:'Shrines give you something — a heal, or an edge.', at:'hero', ttl:2800,
+ {txt:'Shrines give you something — a heal, or an edge.', at:'hero', ttl:8400,
   done:()=>false},
  {txt:'Now walk to the gate.', go:'Cross to the far side', at:'goal',
   done:()=>false},
@@ -1518,7 +1539,10 @@ function tutorialCheck(){
     if(S.goal){ c=S.goal[0]; r=S.goal[1]; } else { c=S.hero.col; r=S.hero.row; }
   }
   else { const e=S.enemies.find(x=>x.alive)||S.hero; c=e.col; r=e.row; }
-  renderBubbles([{c,r,txt:cur.txt,go:cur.go}]);
+  // the shrine's own "what you got" banner floats above this same tile —
+  // lift the bubble clear of it instead of blotting it out
+  const lift=effects.some(e=>e.type==='pickup'&&e.col===c&&e.row===r);
+  renderBubbles([{c,r,txt:cur.txt,go:cur.go,lift}]);
 }
 function renderBubbles(list){
   const box=document.getElementById('bubbles');
@@ -1532,7 +1556,9 @@ function renderBubbles(list){
       const below = b.r<=1;
       d.className='bubble'+(below?' below':'');
       d.style.left=cx(b.c)/W*100+'%';
-      d.style.top =((below? tileY(b.r)+TILE+5 : tileY(b.r)-5)/H*100)+'%';
+      // when a pickup banner is floating on this tile, clear it instead of covering it
+      const lift=(!below&&b.lift)?20:0;
+      d.style.top =((below? tileY(b.r)+TILE+5 : tileY(b.r)-5-lift)/H*100)+'%';
     }
     d.innerHTML=`${b.txt}${b.go?`<span class="go">${b.go}</span>`:''}`;
     box.appendChild(d);
@@ -1553,6 +1579,9 @@ function teach(id,txt,go,x,y,ms=5200){
   renderBubbles(null); tutorialCheck();
   setTimeout(()=>{ pinned=null; tutorialCheck(); }, ms);
 }
+// MP doesn't exist to the player until the 'mp' lesson has actually fired —
+// same flag everywhere, so no shrine, HUD bar, or draft screen can leak it early.
+const mpKnown=()=>!!taught.mp;
 /* Adaptive hints. These only ever reach a player who is actually struggling —
    someone doing the right thing never sees them, and so is never talked down
    to. Each fires once per run. */
@@ -1599,7 +1628,7 @@ function updateHud(){
   /* MP stays hidden until the player owns something that spends it. A meter
      that cannot move teaches nothing and invites "what even is that?" — it
      appears at the moment it first means something. */
-  const usesMp = h.skills.some(id=>SKILLS[id]&&SKILLS[id].mp);
+  const usesMp = mpKnown();
   const mpEl=document.getElementById('hMp');
   mpEl.style.display = usesMp? '' : 'none';
   if(usesMp) pips(mpEl,h.mp,maxMp(),'mp','MP');
@@ -2261,7 +2290,14 @@ cv.addEventListener('click',ev=>{
   if(e&&S.attackable.has(e)){ playerStrike(e,'physical'); return; }
   playerStep(t.col,t.row);
 });
-document.getElementById('curtain').addEventListener('click',restart);
+// clicking the backdrop takes the primary action for the result shown —
+// retry the level after a loss, since there is no level to retry after a win
+document.getElementById('curtain').addEventListener('click',ev=>{
+  if(ev.target.closest('button')) return;
+  if(S.over==='win') restart(); else retryLevel();
+});
+document.getElementById('btnRetry').onclick=ev=>{ ev.stopPropagation(); retryLevel(); };
+document.getElementById('btnRestartEnd').onclick=ev=>{ ev.stopPropagation(); restart(); };
 document.getElementById('btnEnd').onclick=endTurn;
 document.getElementById('btnRestart').onclick=restart;
 document.getElementById('btnSkip').onclick=skipDraft;
@@ -2285,7 +2321,7 @@ window.addEventListener('keydown',ev=>{
 
 /* ============================ BOOT ============================ */
 function restart(){
-  S=newRun(); pendingPick=null; pinned=null; taught={};
+  S=newRun(); pendingPick=null; pinned=null; taught={}; sceneOnDone=null;
   document.getElementById('scene').className='curtain scene';
   document.getElementById('draft').className='curtain';
   document.getElementById('curtain').className='curtain';
