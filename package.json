@@ -1,0 +1,9 @@
+{
+  "name": "the-cold-city",
+  "private": true,
+  "description": "Build step for deployment: the game is one self-contained file, so 'building' is copying the single source of truth into the output directory as index.html. This is what stops the deployed site drifting from the repo — there is no second copy to keep in sync by hand.",
+  "scripts": {
+    "build": "mkdir -p public && cp pilgrim/web/pilgrim.html public/index.html",
+    "serve": "python3 -m http.server 8000 --directory pilgrim/web"
+  }
+}
