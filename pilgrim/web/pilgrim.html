@@ -101,8 +101,9 @@
     0%,100%{margin-left:0} 20%{margin-left:-5px} 45%{margin-left:5px}
     70%{margin-left:-3px} 88%{margin-left:2px}
   }
-  /* and the board reads as paused while it waits */
-  .stage.awaiting canvas{filter:saturate(.55) brightness(.72)}
+  /* the board itself now dims on the canvas (see drawTutorialDim) so the
+     tile the box is talking about can stay lit through it — the CSS
+     filter used to darken everything uniformly, target included */
   /* The bubble itself lets clicks fall through to the board beneath it, but
      the triangle in its corner is a real button — that's the one thing on
      it you can click, and it's the only way a tutorial box goes away now. */
@@ -442,7 +443,7 @@ wall_tape3:{d:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACIAAAAiCAYAAAA6Rwv
 wall_barrel:{d:"data:image/png;base64,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",w:28,h:34,a:14.0},
 wall_trash:{d:"data:image/png;base64,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",w:33,h:34,a:16.5},
 burn_trash1:{d:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABUAAAAhCAYAAAA2/OAtAAABWGlDQ1BJQ0MgUHJvZmlsZQAAeJx9kLFLw1AQxr9WpaB1EB0cHDKJQ5SSCro4tBVEcQhVweqUvqapkMZHkiIFN/+Bgv+BCs5uFoc6OjgIopPo5uSk4KLleS+JpCJ6j+N+fO+74zggOW5wbvcDqDu+W1zKK5ulLSX1jAS9IAzm8Zyur0r+rj/j/T703k7LWb///43Biukxqp+UGcZdH0ioxPqezyXvE4+5tBRxS7IV8onkcsjngWe9WCC+JlZYzagQvxCr5R7d6uG63WDRDnL7tOlsrMk5lBNYxA48cNgw0IQCHdk//LOBv4BdcjfhUp+FGnzqyZEiJ5jEy3DAMAOVWEOGUpN3ju53F91PjbWDJ2ChI4S4iLWVDnA2Rydrx9rUPDAyBFy1ueEagdRHmaxWgddTYLgEjN5Qz7ZXzWrh9uk8MPAoxNskkDoEui0hPo6E6B5T8wNw6XwBA6diE8HYWhMAAAP4SURBVHicrVVdaFxFFP5mbpLdbLbbbHazd3dyE9FYFSP+hISIQkskJoSCwRZpU8WHgrV5aAWpb8UHIb7EgAiiKD4UG1uw2Ni8VAXxd5GgVqhR9MmEJPsTzc8m6Waze++Rmb13vWl+TGAPzJ45Z85855uzM+cCuxASgkjX70I5hYSgvcTzXQB+tFcSfBcx/WUFJcNosKf3lQ0UptkpFZud/aN8oIy9JwlTLPZh+UAB71xfkIGx5ygaPVQeUCIq+DU7kn9VHlDGTKksL9/THebbBgMMQOW+G6tIHa2Trnk3AAlxnYRI742pEJZUnkTe8ShkEuID2+4BUL9rUBLinDM3/cWQTFuN4zq5LZH/YToEQFFcOBhQjtV7q1U+O+kNqdNPB2lHULLr1V5d3Wi7Kp01ZhX3LnX4ZZ2lPLzU4Yfp05RNhlG9CZSECDuO8WBwalPmBq/St+4u6tvnMM3ktscnIY657YVDxaPXHNOxozAWICEmN4Cy2dm/bfuyO3bNqAKvs6tgVy/xbBjJ/hACZxuBCqcaSpq2ZOqI3CgH93L4n48Vna79xBnAGQKnDRVX8sdiL7trOqG0xv4LYoD/tIGLAzfzmTencCUMc+FIWPE9/v1MMWYjU1mG4RIogPvlT/J4SBkSLPBSEzq6vqaCaanzHz0c0+o+W1Ao38T/weM934Ky6n0Uibjw+cZUQPTiXJp5OJZXCpj4fZm99cOcYscuJGCuFFRMb28vwnob2h/9snRPEyfCm0FNpxsxFplpHcfoud/w6YEIpuZzis6pH2sszhg6ryxicHAQZxsb8WBLB/vuesr6/P0psAIpDBKijzuf3sOTadzxxk38/NT+gqFp+DWVhVgkrBGt948HqefICf7a8mO454GHMDIygk4h8ML588jl9vNL2ez6Lz8tQltRTW20gqVSS3/pOk75fPknPJ7KmL+i4lJ7Fd6+lsArurqf3tV4nK5lMtR/5gyfnp7G2NgYPkkm8cXkJNoGBpC9erVKm5hAurISEV48PL1bW0v5WIyaNI0uP3OnrJMaHweDdNLnoyjn0l4PhULU0tJC3d3d9Hp9PXV1dVFzc7M52tdHfxqGeaG2llai0SUFuo8xa0bX6UmPh7yMyRo6wO65DC4l1IuJaGhoyHpH1+lFv39N2gygCom6TMQaUilFO6ZpSJiqNu4rL/92v/uWpCwLkUgEuVyOvZrJIJvNFjsY7IewxXAzlMPcyj88PGy1traSrusb9nMAB1wE5m2AnMuXd109yXzFWYjH40wIgXQ67QDCfbxbADb0RNnsXUdXn5LbRLKWyeS61JJMqQc7Ihk7rB/ZpizOkCTkkHMJ6i7LnkS+w50SHXQi/wUm6YwaZsjBYAAAAABJRU5ErkJggg==",w:21,h:33,a:10.5},
-burn_trash2:{d:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABsAAAAmCAYAAAA1MOAmAAABWGlDQ1BJQ0MgUHJvZmlsZQAAeJx9kLFLw1AQxr9WpaB1EB0cHDKJQ5SSCro4tBVEcQhVweqUvqapkMZHkiIFN/+Bgv+BCs5uFoc6OjgIopPo5uSk4KLleS+JpCJ6j+N+fO+74zggOW5wbvcDqDu+W1zKK5ulLSX1jAS9IAzm8Zyur0r+rj/j/T703k7LWb///43Biukxqp+UGcZdH0ioxPqezyXvE4+5tBRxS7IV8onkcsjngWe9WCC+JlZYzagQvxCr5R7d6uG63WDRDnL7tOlsrMk5lBNYxA48cNgw0IQCHdk//LOBv4BdcjfhUp+FGnzqyZEiJ5jEy3DAMAOVWEOGUpN3ju53F91PjbWDJ2ChI4S4iLWVDnA2Rydrx9rUPDAyBFy1ueEagdRHmaxWgddTYLgEjN5Qz7ZXzWrh9uk8MPAoxNskkDoEui0hPo6E6B5T8wNw6XwBA6diE8HYWhMAAAQ3SURBVHicxZbvS2RVGMe/597RcRxHx/l1d46llmwYkpVasi4bbE6ib4xAqHQhCIqFgc1tIxQCC5JeiPuqP6CFROpNhAVBFLsVbkUYLGtBLImkzTjqqrPT3J2ZO+fEOd6xu+OMP1d74Nxz7vnxfJ7zPM88d4ADCKd0DMclnFLOKW3Z7znl4ETuPD6YojyF4xBOaUq48rhu9rt05D6ByoFQjPUDIAAyPBg0jhamKNfMEQchKq+peeXoYMCQeET6vaUA/gDnHx0djLEfZU+EJ/GIdWmnOB4MFo3+lhtGBnwSzymd2w24I4w3NQk3bRMiYrVtCnWc0rvmO9s3DGtrqYJGmJYHPl+T75EBn4CJZje3XNk/bAeQkFivu/AmXb94KJgRDM5tiwUhqByshVJlQ/Rl75Y9cDjWDwTjlH7HAaISUi+SwUyIrV4yy1VwheTmksV07QbLADhjxmNLrCAhzhc12Nurtl6lkZrm3C/MJp+UZvX6XOxlokv3iSaFA/ZTVf8ZQsChqgkeDF7cO4yxh8VTKFg/7ZL3K33chco36yTg7vdmaIh5pV4/3NfvINLvI8yhiJhe3jtMUf607ql8oxZlZ6uhzyaQ/GIZw6/O4M7leRhzulz/5PoyErd0VF6oxeoFav2qv7QXN27FSvGUyP6f1TTmdAOPvTWDd1wunJhcReSFG2DrBl5/+wYC0ajUWt4XsOqZ3AsMG+0Vmx7dMJBeSuO9oVk8/fwPWEpkeN3SkiwVmqpi6BLQ09ODzs5ONJ/+lifixrZEKgrjwaDIQlTcTMJ22wCyHK+d+xkfzGQxr2mSr2kaztTXM080iqnZWYyOjiIUCuGhhlPkxKNfydL1Szr9k6kvYyvuQNIruvejG7j0pQE7IaiJZzCMDD6skpmXbmxsLOvr61Oam5uxuLiIiYkJDA4Ooq2tDfF4vAxI4Ql3WTuSTOizkaI3M6vFN6mUManr6rN2OxlY26yF5xwOfKzrYp21traScDisLCwsYGpqCisrK+jo6JDAXz/7FFduzePvbBZUVYvHSgH4ZHU1v+n3c7PKWxuzjNNer5c3NTXxrq4u7na7eSgU4g0NDdmx8+dz/1N4OhjcTNlilxNKH1TVQgDreCPPENnGxsbYA14ve87hSObmisfMjNxf2WzBebMXf3Yq8hcDgQBSqRRZTSbxta4XDVX+zXZyn2jZQvPj4+OspaWFa5p2z/mdfmcnLePbpuJUXpHOnScAErmF6elpQilFLBbLge5xRzER/nbkzcUtLvQUOMNMIwyzF0Zulp89yEnLLZ8s4l5uNmFcLiGMPPfeF/HtYsAz+L+EHBvI7/eLgLssc1cJIddisdi79x3m8Xj4yMgInE4nGGPgXHzRVQwPD1v3XRWP5eXls4eC+f1+1t3dLaAoLy+Hz+dDSUkJXC4XSktLYbNtFhlCCMLh8KEM+BfIHK6b0rMxpAAAAABJRU5ErkJggg==",w:27,h:38,a:13.5},
+burn_trash2:{d:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABUAAAAhCAYAAAA2/OAtAAABWGlDQ1BJQ0MgUHJvZmlsZQAAeJx9kLFLw1AQxr9WpaB1EB0cHDKJQ5SSCro4tBVEcQhVweqUvqapkMZHkiIFN/+Bgv+BCs5uFoc6OjgIopPo5uSk4KLleS+JpCJ6j+N+fO+74zggOW5wbvcDqDu+W1zKK5ulLSX1jAS9IAzm8Zyur0r+rj/j/T703k7LWb///43Biukxqp+UGcZdH0ioxPqezyXvE4+5tBRxS7IV8onkcsjngWe9WCC+JlZYzagQvxCr5R7d6uG63WDRDnL7tOlsrMk5lBNYxA48cNgw0IQCHdk//LOBv4BdcjfhUp+FGnzqyZEiJ5jEy3DAMAOVWEOGUpN3ju53F91PjbWDJ2ChI4S4iLWVDnA2Rydrx9rUPDAyBFy1ueEagdRHmaxWgddTYLgEjN5Qz7ZXzWrh9uk8MPAoxNskkDoEui0hPo6E6B5T8wNw6XwBA6diE8HYWhMAAAPNSURBVHicrVX/axxFFP/M7NnLNU1yyTW33YkmqUGJHEZNoqEpFTRnIL9EhEBrWhAEpRCoqS2SQn8RDP5wpD/5B1gwBP1FJAqCKPiFVEUilKaCFEMwaS5p0iTX87Z3t7sjM9m5TnOXa0PvwduZnTfzee993rxdoIxwxhKotHDGOGesc6/n6IOReXXlQSl9EZUUzlhWUFDpSP+SBOwRmJa1et4wAAIgzy3LqQwopT/6Mw5CDN7U9NajgwJj4rE8HNkH4G9w/umjg3rer3IkggE8rZvK8UzLgiaT19V0+eRB6YYzNv8gYCqNsZhIr0iI4LJoCS2csbsql90j3djIljKqSKJfbahoBajQoL/l8u6gJURPbXUwXGoLYNtnHwrUsaz5Iq4IQe1oM2hdAMk3IwW/CIU2y4Jyxn7iADEIaRVF8QtTGCX2fgOcErWWKR0+CqB5AMd8vgqiAwqpPm4i2FNXeJXBmGb1bqAB+WTMtVtVDeQFkmkL9RNG8EjdPYcEHIaR5pZ1thjU854UT7Fx82iNjHffczWofb9FAt392afOz6N6sBHhK3ewPHyQeCEqOL9UDErpPzq/te81o+qVethzaWS+voULb8/izqUFOPO2tH9+5RbSN2zUnmnG+hmmaiK+Zif09Atc0obH5Pjfeg7ztoNnz8/iYk0NDk2tY/mNq/A2Hbz7wVVEk0l5ev9QVA9ySgfFVs+BbSa2HORWcvhwbA4vvf4LVtJ53rKyIlvHNAyMnQMGBgbQ19eHjqM/8HTKKSoo5ZYlqo4D1zII3HYAl+OdU7/j41kXC6Yp/ZimiWOtrV5DMonpuTmMj48jHo/jcNsRcuiZb2XL/pHL/SZpsKx8AIQMipePkls4942DICFoSuVxAXl8UicrnWtvb68aGhqiHR0dWFpawuTkJEZHR9Hd3Y1UKlUFZPF8uKoHGU8ULUBU93yfzTpTtm28GgySkxvbvX4qFMJnti3sXldXFxkZGaGLi4uYnp7G2toaent7JfCfX36ByzcWcNN1wQxDksqn6uv5tcZG7n+VdPW0eS4SifBYLMb7+/t5OBzm8Xict7W1uYnTp9V/jOcsS14RefgJwygFpM+3djiUmkgkvMcjEe+1UCij1gLqSv3ruju7Tb9q4qe3fT00iUajyGazZD2TwXe2fV+L8xKqRyjULbU+MTHhdXZ2ctM07ztPATylObjtA+gf7fyOJkkrw8zMDGGMYXV1VQFCT0/wEdqRXUpLvaEENSJq4UzYxSiC2W5HTUTEKuoXdqFFqQhCFUaA6rTsSUQvlnP0str5PyJ0kpd1AJk9AAAAAElFTkSuQmCC",w:21,h:33,a:10.5},
 burn_trash3:{d:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABUAAAAhCAYAAAA2/OAtAAABWGlDQ1BJQ0MgUHJvZmlsZQAAeJx9kLFLw1AQxr9WpaB1EB0cHDKJQ5SSCro4tBVEcQhVweqUvqapkMZHkiIFN/+Bgv+BCs5uFoc6OjgIopPo5uSk4KLleS+JpCJ6j+N+fO+74zggOW5wbvcDqDu+W1zKK5ulLSX1jAS9IAzm8Zyur0r+rj/j/T703k7LWb///43Biukxqp+UGcZdH0ioxPqezyXvE4+5tBRxS7IV8onkcsjngWe9WCC+JlZYzagQvxCr5R7d6uG63WDRDnL7tOlsrMk5lBNYxA48cNgw0IQCHdk//LOBv4BdcjfhUp+FGnzqyZEiJ5jEy3DAMAOVWEOGUpN3ju53F91PjbWDJ2ChI4S4iLWVDnA2Rydrx9rUPDAyBFy1ueEagdRHmaxWgddTYLgEjN5Qz7ZXzWrh9uk8MPAoxNskkDoEui0hPo6E6B5T8wNw6XwBA6diE8HYWhMAAAOdSURBVHicxVRNbBtFFP5mvW7tOE6TLvLicUxFTSVXKU5xIiQswckyiErAIQhoBeKEVHLxhdy49MIhRAhx4MI1cEyj9BL+BJYaiYJE1AMqUoQEzY/rmJ84qY296x30ZnfdXcdJa0HEk1Y7++a9b773vTcLPIAJzgX6MKWf4P8V9L4mOL+JI2D6+FGA4khAxSHd77Wn9M/DA3jqVPy/L98wPvxXoKK3BFN9gwpdf9T3HY8Xu0IYgGZPUKHrkZ5MAoFf6FU/E3Ig2Af74hjL9GYajZqHMd55ctBfAedfCM4L8iMY/K0nKFtb21eC4DwnAS2r42sPBtxlHsCyXLVaV9BDE2lUFtvcpG8dwJbgXO41Th/HX09F7SAA2pc7OHbHgNecvC5Nua2TSCTOAyifVVXJfM00fYBkv+dPoJaN7Hp93Torvgwhfnw3GsVPsZjszGlVle7wcxqGio90wu6eDUe3Lj3kSz0YFMCVqM2MkiqvaHIdTEfsMoNMgrNjdlr5onYoqHAd5Vc1CUjWTB6X/sHENVhv/QyYdhgbsNMEuyeliMc7E6SKkZETbsPM4QBEgCH+aRV3b2RlfnT0Wg3A0F5mAJGXdRRy31hLlx5T3HFxCcTnq53RUBAKXZcnqQzbF0ZszW5kYRgWMRRCYIi2hy6Pwtpu4eZWvVlrmGhbApt/tqDutvc1TAFj8k9TdvSLXHxYivHGs9eJPlVAgezC09+2f716B/nnXwi/fSuJN1djmPzkljAGFR9jkUiMU3tPekW+3TBxbvRzbL6TwXulMj76rmLpuh4wEil2/uMVJJN7WFxcxPKynH2WeP+rv6++lgq9WGo4dMWqPTMk2g97qIwP4Fzu69sAkqtbdbw+fpJAW+l0OjQ1NaVkMhlsbGxgfn4exWIRk5OTqNVqoZc++76hAmGDc7uRzk2iNTWE5sl3O5zyrYmJCTY9Pa2sr69jaWkJ1WoVuVxOAi8sLKBUKlmCc9Ji20066LE865amaWJsbEwUCgUxPDws8vm8SKVS7ZmZGZFOp+tO3OUOkwOAvOudXgfPzs5amqZZqqruuj7VKbG7ZHT5abD9/z8AsVgMzWaT1et1mKbZ6Q8eoGx62r38c3NzVjabFbqu+/IVAGdwz/5wALz/V8NznYn5nruxsrLCOOeoVCouINwgMhI57AEio2kgo9J9s+wYsabDaJ/eRCbYHUSMXdZP3GcqiITbbQL1ytKX0T087KBn3Mh/AB7ndrWnJlsFAAAAAElFTkSuQmCC",w:21,h:33,a:10.5},
 exit_locked:{d:"data:image/png;base64,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",w:23,h:34,a:11.5},
 exit_ready:{d:"data:image/png;base64,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",w:23,h:34,a:11.5},
@@ -646,17 +647,17 @@ POOLS.all = [...POOLS.basic,...POOLS.actives1,...POOLS.actives2,...POOLS.passive
 POOLS.mechanic = ['return_fire','mech_whirlwind','incendiary_shot'];
 
 /* ============================ EQUIPMENT ============================
-   Bought (not drafted) at a Shop Level, 8-12 credits apiece. The Shopkeep's
-   free parting gift (S.hero.gift) counts as one of the three — these are the
-   other pieces you can afford along the way. */
+   Bought at a Shop Level, 8-12 credits apiece — except your first piece,
+   which the Shopkeep hands you free the first time you meet him (same
+   three options, no charge). */
 const EQUIPMENT={
   vital_tracker:{name:'Vital Tracker', ds:'20% chance to deal double damage on any attack.'},
-  padded_armor: {name:'Padded Armor',  ds:'+2 defense.', mod:{def:2}},
+  padded_armor: {name:'Padded Armor',  ds:'Ignore 30% of all damage taken.'},
   speed_boots:  {name:'Speed Boots',   ds:'+1 move.', mod:{move:1}},
 };
 const EQUIP_IDS=Object.keys(EQUIPMENT);
-const MAX_EQUIP=3;                                  // gift + purchases combined
-function equipCount(){ return (S.hero.gift?1:0) + S.hero.equip.length; }
+const MAX_EQUIP=3;
+function equipCount(){ return S.hero.equip.length; }
 
 /* ============================ CONSUMABLES ============================
    Fill the three purple ITEM slots. Sold two ways: the Shopkeep's honest
@@ -1096,13 +1097,34 @@ function generateLayout(F,floorIndex){
       // never on the pilgrim's own entry tile (he can spawn right beside
       // the Shopkeep, and that tile is still a valid crate neighbor).
       // "Beside" means an orthogonal neighbor, always, not a maybe.
-      const nearOptions=N4.map(([dc,dr])=>[first[0]+dc,first[1]+dr])
-        .filter(([c,r])=>inB(c,r) && !wallSet.has(key(c,r)) && !taken.has(key(c,r))
-          && key(c,r)!==frontOfExitK && !(c===GEN_START_COL&&r===GEN_START_ROW));
-      if(!nearOptions.length) continue;               // nowhere beside him — reroll
+      // A room with its own obstacle art (the Mechanic's burning trash)
+      // spreads across the whole floor instead of huddling next to him.
+      const spreadObstacles = F.obstacleDeco==='burn_trash';
+      const nearOptions = spreadObstacles
+        ? openReach.filter(([c,r])=>r>1 && !taken.has(key(c,r)) && key(c,r)!==frontOfExitK)
+        : N4.map(([dc,dr])=>[first[0]+dc,first[1]+dr])
+            .filter(([c,r])=>inB(c,r) && !wallSet.has(key(c,r)) && !taken.has(key(c,r))
+              && key(c,r)!==frontOfExitK && !(c===GEN_START_COL&&r===GEN_START_ROW));
+      if(!nearOptions.length) continue;               // nowhere to put one — reroll
       const [boxLo,boxHi]=F.obstacleCount||[1,2];
       const boxCount=Math.min(randInt(boxLo,boxHi), nearOptions.length);
-      const candidates=shuffled(nearOptions).slice(0,boxCount);
+      let candidates;
+      if(spreadObstacles){
+        const OBST_SPACING=2;
+        const placed=[[first[0],first[1]]];    // spread away from him too, not just each other
+        const pool=shuffled(nearOptions);
+        candidates=[];
+        while(candidates.length<boxCount && pool.length){
+          const spaced=pool.filter(([c,r])=>placed.every(([pc,pr])=>
+            Math.max(Math.abs(c-pc),Math.abs(r-pr))>=OBST_SPACING));
+          const options=spaced.length?spaced:pool;
+          const [c,r]=options[Math.floor(Math.random()*options.length)];
+          candidates.push([c,r]); placed.push([c,r]);
+          pool.splice(pool.findIndex(([pc,pr])=>pc===c&&pr===r),1);
+        }
+      } else {
+        candidates=shuffled(nearOptions).slice(0,boxCount);
+      }
       const testWalls=new Set(wallSet);
       for(const [c,r] of candidates) testWalls.add(key(c,r));
       const reachTest=genReachable(testWalls,GEN_START_COL,GEN_START_ROW);
@@ -1267,12 +1289,7 @@ function mods(){
     if(d.mpCut) m.mpCut+=d.mpCut;
     if(d.move)  m.move +=d.move;
   }
-  switch(S.hero.gift){                   // the shopkeep's parting gift, all run
-    case 'offense': m.extra+=1; break;
-    case 'defense': m.def  +=1; break;
-    case 'speed':   m.move +=1; break;
-  }
-  for(const id of S.hero.equip){         // gear bought at a Shop Level
+  for(const id of S.hero.equip){         // gear bought at a Shop Level, or the Shopkeep's free first piece
     const g=EQUIPMENT[id]; if(!g||!g.mod) continue;
     if(g.mod.def)  m.def  +=g.mod.def;
     if(g.mod.move) m.move +=g.mod.move;
@@ -1732,7 +1749,10 @@ function tickPoison(){
 
 /* ============================ ENEMY AI ============================ */
 function enemyHit(e,type){
-  return calcDamage({basic:e.bd,extra:0,hits:1,def:heroDef(),type:type||e.dtype});
+  const d=calcDamage({basic:e.bd,extra:0,hits:1,def:heroDef(),type:type||e.dtype});
+  // Padded Armor: a straight 30% cut off whatever gets through, rounded
+  // down so the player never loses the rounding on a hit they took
+  return hasEquip('padded_armor') ? Math.floor(d*0.7) : d;
 }
 function goonAct(e){
   const h=S.hero;
@@ -2195,13 +2215,6 @@ const SCENE_REPEAT=[
   {who:'Shopkeep', npc:'merch_crystal', line:'“Mind the merchandise.”'},
 ];
 let SCENE1=SCENE_ALL, sceneEndMode=null;
-/* His gift is permanent: it rides with you for the whole run, unlike the
-   level blessings, so it lives outside hero.buffs. */
-const GIFTS={
-  offense:{name:'A Whetted Edge', ds:'+1 damage on every strike, for the whole run.'},
-  defense:{name:'A Padded Coat',  ds:'Take 1 less damage from every hit, for the whole run.'},
-  speed:  {name:'Worn-in Boots',  ds:'Move 1 extra tile each turn, for the whole run.'},
-};
 let sceneStep=0, sceneTook=false;
 const sceneShowing=()=>{
   const el=document.getElementById('scene');
@@ -2656,10 +2669,10 @@ function drawScene(){
 }
 function renderGiftCards(){
   const cards=document.getElementById('sceneCards');
-  for(const id of ['offense','defense','speed']){
-    const g=GIFTS[id];
+  for(const id of EQUIP_IDS){
+    const g=EQUIPMENT[id];
     const b=document.createElement('button'); b.className='card';
-    b.innerHTML=`<div class="cat">${id.toUpperCase()}</div>
+    b.innerHTML=`<div class="cat">GEAR</div>
       <div class="nm">${g.name}</div><div class="ds">${g.ds}</div>
       <span class="tag swap">a gift</span>`;
     b.onclick=()=>{
@@ -2669,7 +2682,7 @@ function renderGiftCards(){
         typeLine('“This ain’t a charity, kid.”');
         return;
       }
-      sceneTook=true; S.hero.gift=id;
+      sceneTook=true; S.hero.equip.push(id);
       document.getElementById('sceneWho').textContent='Shopkeep';
       showNpcPortrait('merch_book');
       typeLine('“Thanks for your business.”');
@@ -2726,10 +2739,8 @@ function grant(id){
   say(`skill learned — ${k.name.toLowerCase()}.`);
   if(id==='vitality') S.hero.hp=Math.min(maxHp(),S.hero.hp+2);
   S.hero.hp=Math.min(S.hero.hp,maxHp());
-  // the first spell you own is the first time MP means anything — say so then
-  if(k.mp) setTimeout(()=>teach('mp',
-    `The purple bar is magic. ${k.name} spends ${k.mp} of it.`,
-    'It refills at each new floor', 78, 30), 500);
+  // the MP box now waits for the first time it actually matters — trying
+  // to cast, not just owning the skill — see startActive()
   if(k.kind==='active'&&!k.mp) setTimeout(()=>teach('active',
     'Active skills sit under the board. Limited uses each battle.',
     '', 50, 96), 500);
@@ -2888,6 +2899,10 @@ function addDismissTri(d,onDismiss){
 function renderBubbles(list){
   const box=document.getElementById('bubbles');
   box.innerHTML='';
+  // whatever the box is pointing at on the board stays lit when the dim
+  // comes up — a pinned (panel-anchored) box has no tile to point at
+  const first=list&&list[0];
+  tutHighlightTile = (first&&first.c!=null) ? {c:first.c,r:first.r} : null;
   for(const b of (list||[])){
     const d=document.createElement('div'); d.className='bubble';
     if(b.x!=null){                                  // pinned to the panel
@@ -2909,7 +2924,7 @@ function renderBubbles(list){
     box.appendChild(d);
   }
   if(pinned) for(const b of [pinned]){
-    const d=document.createElement('div'); d.className='bubble';
+    const d=document.createElement('div'); d.className='bubble'+(b.below?' below':'');
     d.style.left=b.x+'%'; d.style.top=b.y+'%';
     d.innerHTML=`${b.txt}${b.go?`<span class="go">${b.go}</span>`:''}`;
     addDismissTri(d,b.onDismiss);
@@ -2924,10 +2939,10 @@ function renderBubbles(list){
 }
 /* One-off just-in-time lessons: a mechanic is explained the first time it can
    actually be used, anchored to the meter it concerns — never up front. */
-let pinned=null, taught={}, bubbleBlocking=false;
-function teach(id,txt,go,x,y){
+let pinned=null, taught={}, bubbleBlocking=false, tutHighlightTile=null;
+function teach(id,txt,go,x,y,below){
   if(taught[id]) return; taught[id]=true;
-  pinned={txt,go,x,y,onDismiss:()=>{ pinned=null; tutorialCheck(); }};
+  pinned={txt,go,x,y,below,onDismiss:()=>{ pinned=null; tutorialCheck(); }};
   renderBubbles(null); tutorialCheck();
 }
 /* Adaptive hints. These only ever reach a player who is actually struggling —
@@ -3041,6 +3056,10 @@ function updateHud(){
 function startActive(id){
   const h=S.hero, k=SKILLS[id];
   if(S.phase!=='player'||S.over) return;
+  // the first time an active skill is actually tried — not just carried —
+  // is when the purple bar starts to matter; pinned directly under it
+  if(k.mp) teach('mp', `The purple bar is magic. ${k.name} spends ${k.mp} of it.`,
+    'It refills at each new floor', 68.4, 9.5, true);
   if(useLeft(id)<=0) return;
   if(k.mp&&h.mp<mpCost(k.mp)){ say('not enough magic for that.'); return; }
   if(id==='teleport'){                        // blinks anywhere in range — costs the move, not the strike
@@ -3784,6 +3803,28 @@ function drawFog(now){
     ctx.fillRect(tileX(c),tileY(r),TILE,TILE);
   }
 }
+/* While a tutorial box holds the floor, the board dims — except the one
+   tile it's actually talking about, which stays lit and gets a soft
+   pulsing ring so it's obvious what "it" refers to. */
+function drawTutorialDim(now){
+  const gw=COLS*TILE, gh=ROWS*TILE;
+  ctx.fillStyle='rgba(4,2,10,.6)';
+  if(BY>0) ctx.fillRect(0,0,W,BY);
+  if(BY+gh<H) ctx.fillRect(0,BY+gh,W,H-(BY+gh));
+  if(BX>0) ctx.fillRect(0,BY,BX,gh);
+  if(BX+gw<W) ctx.fillRect(BX+gw,BY,W-(BX+gw),gh);
+  for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){
+    if(tutHighlightTile && c===tutHighlightTile.c && r===tutHighlightTile.r) continue;
+    ctx.fillRect(tileX(c),tileY(r),TILE,TILE);
+  }
+  if(tutHighlightTile){
+    const {c,r}=tutHighlightTile;
+    const pulse=.5+.5*Math.sin(now/260);
+    ctx.strokeStyle=`rgba(240,201,135,${(0.55+0.35*pulse).toFixed(2)})`;
+    ctx.lineWidth=2;
+    ctx.strokeRect(tileX(c)+1.5,tileY(r)+1.5,TILE-3,TILE-3);
+  }
+}
 function frame(now){
   turnWatchdog(now);
   // real elapsed time since the last callback, not "one tick" — a browser
@@ -3809,6 +3850,7 @@ function frame(now){
   else {
     drawBoard(now); drawTokens(now); drawFx(now);
     if(!S.over && FLOORS[S.floor] && FLOORS[S.floor].dark) drawFog(now);
+    if(bubbleBlocking) drawTutorialDim(now);
   }
   drawParticles();
   ctx.setTransform(DPR,0,0,DPR,0,0);
