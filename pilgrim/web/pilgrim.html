@@ -87,12 +87,6 @@
     border-top-color:#1b1430}
   .bubble .go{display:block;margin-top:3px;color:#7a3f9e;font-size:8.5px;
     letter-spacing:.12em}
-  /* The triangle alone was not reading as "you must act on this". Say it in
-     words, and make the whole box look like the thing to press. */
-  .bubble .tap{display:block;margin-top:5px;padding-top:4px;font-size:8.5px;
-    letter-spacing:.14em;color:#6b3f8f;border-top:1px dashed rgba(27,20,48,.28);
-    animation:tapPulse 1.4s ease-in-out infinite}
-  @keyframes tapPulse{0%,100%{opacity:.55}50%{opacity:1}}
   .bubble.clickable{box-shadow:0 0 0 0 rgba(244,238,251,.55);
     animation:pop .18s ease-out, waitGlow 1.6s ease-in-out .18s infinite}
   @keyframes waitGlow{
@@ -112,10 +106,15 @@
   /* The bubble itself lets clicks fall through to the board beneath it, but
      the triangle in its corner is a real button — that's the one thing on
      it you can click, and it's the only way a tutorial box goes away now. */
-  .bubble .dismissTri{position:absolute;right:5px;bottom:4px;width:0;height:0;
-    border-left:6px solid transparent;border-right:6px solid transparent;
-    border-top:8px solid #1b1430;pointer-events:auto;cursor:pointer;
+  .bubble .dismissTri{position:absolute;right:-7px;bottom:-9px;
+    width:20px;height:20px;border:2px solid #1b1430;border-radius:50%;
+    background:#f4eefb;pointer-events:auto;cursor:pointer;
     animation:bobTri 1.1s ease-in-out infinite}
+  /* the chevron inside the button */
+  .bubble .dismissTri:after{content:"";position:absolute;left:5px;top:6px;
+    width:0;height:0;border-left:5px solid transparent;
+    border-right:5px solid transparent;border-top:7px solid #1b1430}
+  .bubble .dismissTri:hover{background:#fff;transform:scale(1.12)}
   @keyframes pop{from{transform:translate(-50%,-92%) scale(.9);opacity:0}}
   @keyframes bobTri{0%,100%{transform:translateY(0)}50%{transform:translateY(3px)}}
   @media(prefers-reduced-motion:reduce){.bubble{animation:none}
@@ -2747,16 +2746,14 @@ function renderBubbles(list){
       d.style.left=cx(b.c)/W*100+'%';
       d.style.top =((below? tileY(b.r)+TILE+5 : tileY(b.r)-5)/H*100)+'%';
     }
-    d.innerHTML=`${b.txt}${b.go?`<span class="go">${b.go}</span>`:''}`
-      + '<span class="tap">\u25B8 CLICK THIS BOX TO GO ON</span>';
+    d.innerHTML=`${b.txt}${b.go?`<span class="go">${b.go}</span>`:''}`;
     addDismissTri(d,b.onDismiss);
     box.appendChild(d);
   }
   if(pinned) for(const b of [pinned]){
     const d=document.createElement('div'); d.className='bubble';
     d.style.left=b.x+'%'; d.style.top=b.y+'%';
-    d.innerHTML=`${b.txt}${b.go?`<span class="go">${b.go}</span>`:''}`
-      + '<span class="tap">\u25B8 CLICK THIS BOX TO GO ON</span>';
+    d.innerHTML=`${b.txt}${b.go?`<span class="go">${b.go}</span>`:''}`;
     addDismissTri(d,b.onDismiss);
     box.appendChild(d);
   }
