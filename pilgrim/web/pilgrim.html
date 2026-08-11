@@ -3684,6 +3684,12 @@ cancelAnimationFrame(raf); raf=requestAnimationFrame(frame);
 window.__game={ get S(){return S}, calcDamage, heroProfile, SKILLS, KINDS, FLOORS,
   SPR, IMG, POOLS, openDraft, frame, drawBoard, drawTokens, drawFx,
   noteTrouble,
+  /* Live board geometry. TILE/COLS/ROWS/BX/BY are re-set per level by
+     applyBoardSize(), so anything driving the game from outside (tests,
+     playthrough scripts) must read them rather than assume — hard-coded
+     coordinates silently miss the moment a level changes size. */
+  get geom(){ return {W,H,TILE,COLS,ROWS,BX,BY}; },
+  tileCentre:(c,r)=>({x:cx(c),y:cyr(r)}),
   jump:i=>loadFloor(Math.max(0,Math.min(FLOORS.length-1,i))),
   give:id=>{ if(SKILLS[id]&&!S.hero.skills.includes(id)){ S.hero.skills.push(id);
     renderSlotBar(); updateHud(); } } };
