@@ -87,6 +87,28 @@
     border-top-color:#1b1430}
   .bubble .go{display:block;margin-top:3px;color:#7a3f9e;font-size:8.5px;
     letter-spacing:.12em}
+  /* The triangle alone was not reading as "you must act on this". Say it in
+     words, and make the whole box look like the thing to press. */
+  .bubble .tap{display:block;margin-top:5px;padding-top:4px;font-size:8.5px;
+    letter-spacing:.14em;color:#6b3f8f;border-top:1px dashed rgba(27,20,48,.28);
+    animation:tapPulse 1.4s ease-in-out infinite}
+  @keyframes tapPulse{0%,100%{opacity:.55}50%{opacity:1}}
+  .bubble.clickable{box-shadow:0 0 0 0 rgba(244,238,251,.55);
+    animation:pop .18s ease-out, waitGlow 1.6s ease-in-out .18s infinite}
+  @keyframes waitGlow{
+    0%,100%{box-shadow:0 0 0 0 rgba(244,238,251,.5)}
+    50%    {box-shadow:0 0 0 5px rgba(244,238,251,0)}
+  }
+  .bubble.clickable:hover{background:#fff}
+  /* If they click the board while the box has the floor, shake it — the click
+     did land somewhere, and this shows where it needed to go. */
+  .bubble.nudge{animation:pop .18s ease-out, shakeBox .32s ease-in-out}
+  @keyframes shakeBox{
+    0%,100%{margin-left:0} 20%{margin-left:-5px} 45%{margin-left:5px}
+    70%{margin-left:-3px} 88%{margin-left:2px}
+  }
+  /* and the board reads as paused while it waits */
+  .stage.awaiting canvas{filter:saturate(.55) brightness(.72)}
   /* The bubble itself lets clicks fall through to the board beneath it, but
      the triangle in its corner is a real button — that's the one thing on
      it you can click, and it's the only way a tutorial box goes away now. */
@@ -2725,20 +2747,24 @@ function renderBubbles(list){
       d.style.left=cx(b.c)/W*100+'%';
       d.style.top =((below? tileY(b.r)+TILE+5 : tileY(b.r)-5)/H*100)+'%';
     }
-    d.innerHTML=`${b.txt}${b.go?`<span class="go">${b.go}</span>`:''}`;
+    d.innerHTML=`${b.txt}${b.go?`<span class="go">${b.go}</span>`:''}`
+      + '<span class="tap">\u25B8 CLICK THIS BOX TO GO ON</span>';
     addDismissTri(d,b.onDismiss);
     box.appendChild(d);
   }
   if(pinned) for(const b of [pinned]){
     const d=document.createElement('div'); d.className='bubble';
     d.style.left=b.x+'%'; d.style.top=b.y+'%';
-    d.innerHTML=`${b.txt}${b.go?`<span class="go">${b.go}</span>`:''}`;
+    d.innerHTML=`${b.txt}${b.go?`<span class="go">${b.go}</span>`:''}`
+      + '<span class="tap">\u25B8 CLICK THIS BOX TO GO ON</span>';
     addDismissTri(d,b.onDismiss);
     box.appendChild(d);
   }
   // While any dismissible box is up, that's the only thing you can act on —
   // movement, strikes and skills all wait for the triangle to be clicked.
   bubbleBlocking = box.children.length>0;
+  // the board visibly stands down while a box is waiting on them
+  document.getElementById('stage').classList.toggle('awaiting', bubbleBlocking);
   renderSlotBar();
 }
 /* One-off just-in-time lessons: a mechanic is explained the first time it can
@@ -3587,7 +3613,13 @@ cv.addEventListener('mousemove',e=>hover=pointToTile(e));
 cv.addEventListener('mouseleave',()=>hover=null);
 cv.addEventListener('click',ev=>{
   if(S.over){ restart(); return; }
-  if(bubbleBlocking) return;                        // the tutorial box has the floor
+  if(bubbleBlocking){                               // the tutorial box has the floor
+    // their click was real — bounce the box so they see where it must go
+    for(const el of document.querySelectorAll('.bubble.clickable')){
+      el.classList.remove('nudge'); void el.offsetWidth; el.classList.add('nudge');
+    }
+    return;
+  }
   if(S.walking) return;                             // already on her way out
   if(S.phase!=='player') return;
   const t=pointToTile(ev); if(!t) return;
