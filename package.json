@@ -1,9 +1,10 @@
 {
   "name": "the-cold-city",
   "private": true,
-  "description": "Build step for deployment: the game is one self-contained file, so 'building' is copying the single source of truth into the output directory as index.html. This is what stops the deployed site drifting from the repo — there is no second copy to keep in sync by hand.",
+  "description": "Build step for deployment: the game is one self-contained file, so 'building' is copying the single source of truth into the output directory as index.html. This is what stops the deployed site drifting from the repo \u2014 there is no second copy to keep in sync by hand.",
   "scripts": {
     "build": "mkdir -p public && cp pilgrim/web/pilgrim.html public/index.html",
-    "serve": "python3 -m http.server 8000 --directory pilgrim/web"
+    "serve": "python3 -m http.server 8000 --directory pilgrim/web",
+    "prebuild": "test ! -f pilgrim.html || { echo ''; echo 'BUILD STOPPED: a stray pilgrim.html is at the repo root.'; echo 'The game is built from pilgrim/web/pilgrim.html \u2014 the root copy will NOT deploy.'; echo 'Move your changes into pilgrim/web/pilgrim.html and delete the root file.'; echo ''; exit 1; }"
   }
 }

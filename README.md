@@ -15,6 +15,26 @@ enemy that each punish a different mistake.
 
 ---
 
+
+## Where the game actually lives
+
+`pilgrim/web/pilgrim.html` is the **one source file**. The build is literally:
+
+```
+cp pilgrim/web/pilgrim.html public/index.html
+```
+
+Editing anywhere else does nothing. In particular, uploading through GitHub's
+web UI drops files at the repo **root**, which is not the build path — that has
+silently swallowed a teammate's work twice. A `prebuild` check now fails the
+build if a stray `pilgrim.html` shows up at the root, and tells you where to
+put it instead.
+
+`pilgrim/web/sprites/` is the source art archive. The game embeds everything as
+data URIs, so nothing in there is fetched at runtime — it is kept for
+regenerating the embedded sheets.
+
+
 ## The rules in brief
 
 Each turn you may take **one step** and **one strike**, in either order. Your

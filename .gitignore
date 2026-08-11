@@ -14,3 +14,4 @@ __pycache__/
 
 # build output
 public/
+.vercel
