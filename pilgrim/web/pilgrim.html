@@ -1674,6 +1674,10 @@ function footprint(e){
 const atFootprint=(e,c,r)=>footprint(e).some(([fc,fr])=>fc===c&&fr===r);
 const chebToUnit=(hero,e)=>Math.min(...footprint(e).map(([c,r])=>
   Math.max(Math.abs(hero.col-c),Math.abs(hero.row-r))));
+/* A body with more than one tile is in sight if ANY of its tiles is. Testing
+   only e.col/e.row means the Lance's far corner sitting behind a pillar
+   refuses a shot at the near corner you can plainly see. */
+const losToUnit=(from,e)=>footprint(e).some(([c,r])=>losClear(from,{col:c,row:r}));
 function enemyAt(c,r){ return S.enemies.find(e=>e.alive&&atFootprint(e,c,r))||null; }
 function occupied(c,r,ig){
   if(S.hero.hp>0 && S.hero!==ig && S.hero.col===c && S.hero.row===r) return true;
@@ -1726,7 +1730,7 @@ function computeAttackable(){
   const set=new Set(), h=S.hero, R=heroRange();
   if(!h.struck) for(const e of S.enemies){
     const d=chebToUnit(h,e);
-    if(e.alive && d<=R && (d<=1 || losClear(h,e))) set.add(e);
+    if(e.alive && d<=R && (d<=1 || losToUnit(h,e))) set.add(e);
   }
   S.attackable=set;
 }
@@ -1853,7 +1857,7 @@ function playerStrike(e,type){
   const R = magic? Math.max(2,heroRange()) : heroRange();
   if(chebToUnit(h,e)>R) return;
   // a bow's arrow needs a clear line — it doesn't turn corners
-  if(!magic && chebToUnit(h,e)>1 && !losClear(h,e)) return;
+  if(!magic && chebToUnit(h,e)>1 && !losToUnit(h,e)) return;
   if(magic){
     const cost=mpCost(SKILLS.arcane_bolt.mp);
     if(h.mp<cost){ say('not enough magic to shape a bolt.'); return; }
@@ -4019,12 +4023,16 @@ function drawBoard(now){
       }
     }
   }
-  // strikeable rings
+  // Strikeable rings — one per tile the body actually fills. The Lance is a
+  // 2x2 and every one of its squares takes a hit, so ringing only the tile
+  // its col/row points at made three quarters of the boss look untouchable.
   if(S.phase==='player'&&!S.over&&!S.aiming){
     for(const e of S.attackable){
       const b=.5+.4*Math.sin(now/200);
       ctx.strokeStyle=`rgba(255,92,106,${b.toFixed(2)})`; ctx.lineWidth=1.5;
-      ctx.beginPath(); ctx.arc(cx(e.col),cyr(e.row),TILE*.44,0,7); ctx.stroke();
+      for(const [fc,fr] of footprint(e)){
+        ctx.beginPath(); ctx.arc(cx(fc),cyr(fr),TILE*.44,0,7); ctx.stroke();
+      }
     }
   }
   if(hover&&S.phase==='player'&&!S.over&&
