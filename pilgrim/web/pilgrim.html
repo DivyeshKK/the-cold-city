@@ -2463,7 +2463,7 @@ function walkToTile(tc,tr,onArrive){
    Their own square is solid, so the destination is the nearest one beside
    them — ranked by the length of the actual route rather than the crow's
    flight, so a wall between you never picks the tile on its far side. */
-function walkToNpc(npc){
+function walkToNpc(npc,onArrive){
   if(S.hero.moved||S.walking) return false;
   let best=null,bestLen=1e9;
   for(let dc=-1;dc<=1;dc++) for(let dr=-1;dr<=1;dr++){
@@ -2478,7 +2478,7 @@ function walkToNpc(npc){
   return walkToTile(best[0],best[1],()=>{
     if(npc.col<S.hero.col) S.hero.face='left';
     else if(npc.col>S.hero.col) S.hero.face='right';   // she turns to face them
-    talkToNpc(npc);
+    (onArrive||talkToNpc)(npc);
   });
 }
 function walkToExit(){
@@ -3198,6 +3198,46 @@ function closeDraft(){
   S.floor++; S.hero.hp=Math.min(maxHp(),S.hero.hp+3);   // a breath between floors
   loadFloor(S.floor);
 }
+/* ============================ BYSTANDERS ============================
+   The people who aren't going anywhere. One line each, and nobody says the
+   thing outright — between them they sketch it: someone is at the top of
+   this, nobody may name him, the place is run rather than lived in, and
+   everyone has learned to keep their voice down. Keyed by decor sprite, so
+   the same body always says the same thing and the room stays consistent
+   across the reroll that places them. */
+const BYSTANDERS={
+  side_backpack:{who:'A packed traveller',
+    line:'“Bag’s been by the door since spring. They haven’t opened the gate. I haven’t unpacked.”'},
+  side_orange1:{who:'Warming his hands',
+    line:'“Don’t ask the mechanic what he’s building. Don’t ask anyone anything.”'},
+  side_orange2:{who:'Off shift',
+    line:'“Quota went up again. Nobody announced it. It just went up.”'},
+  side_duo1:{who:'Keeping her voice down',
+    line:'“My brother asked who decides things. That was two winters ago.”'},
+  side_duo2:{who:'Keeping his voice down',
+    line:'“Don’t finish that sentence. Not out here.”'},
+  side_bluehair:{who:'Leaning on the rail',
+    line:'“Somebody’s at the top of all this. Has to be. Nobody’s ever seen him.”'},
+  side_machine:{who:'Beside the machine',
+    line:'“City runs beautifully. It just doesn’t run for us.”'},
+  side_wall:{who:'Against the wall',
+    line:'“Same patrol, same hour, every day. Cities don’t keep time like that. Machines do.”'},
+  table_solo:{who:'Alone at a table',
+    line:'“I’m not waiting for anyone. A full room reads better on the count.”'},
+  table_duo:{who:'Two at a table',
+    line:'“We only talk about the weather. It’s the one subject nobody writes down.”'},
+  table_ramen:{who:'Eating, fast',
+    line:'“Eat it hot. The sirens don’t wait for you to finish.”'},
+};
+/* A bystander is one beat and no cards: openScene with a null end-mode shuts
+   itself the moment the line is dismissed. They keep no `talked` flag — these
+   are people you can go back to, not a quest you tick off. */
+function talkToBystander(d){
+  if(!d||S.walking||sceneShowing()) return;
+  const b=BYSTANDERS[d.kind]; if(!b) return;
+  S.talkingKind=null;                    // nobody in S.npcs owns this portrait
+  openScene([{who:b.who, npc:d.kind, line:b.line}], null);
+}
 /* He never talks first — clicking him is the only way this ever opens. */
 function talkToNpc(npc){
   if(!npc||S.walking||sceneShowing()) return;
@@ -3753,7 +3793,9 @@ const PAL={ground:'#3a3740',groundAlt:'#423f4a',grid:'rgba(84,219,214,.09)',
   wallFront:'#413c52',wallTop:'#655f75',terrace:'#6fae7a',shrine:'#e9cf8a',
   // same tiles, nudged toward a colour that says "shop" or "mechanic" at a glance
   groundShop:'#3c3c56',groundAltShop:'#444460',
-  groundMech:'#4a3e36',groundAltMech:'#52463e'};
+  groundMech:'#4a3e36',groundAltMech:'#52463e',
+  // the Lance's floor is washed pale — bleached ground, not city concrete
+  groundLance:'#565360',groundAltLance:'#615e6c'};
 /* a stable, non-flickering "hash" so each tile's concrete grain looks the
    same every frame instead of re-rolling on every redraw */
 function tileHash(c,r){
@@ -3842,8 +3884,10 @@ function drawBoard(now){
   // flecks per tile — always the same ones, so they never flicker — sell it
   // as worn concrete instead
   const introNow=FLOORS[S.floor]&&FLOORS[S.floor].intro;
-  const floorG = introNow==='shop'?PAL.groundShop : introNow==='mechanic'?PAL.groundMech : PAL.ground;
-  const floorA = introNow==='shop'?PAL.groundAltShop : introNow==='mechanic'?PAL.groundAltMech : PAL.groundAlt;
+  const floorG = introNow==='shop'?PAL.groundShop : introNow==='mechanic'?PAL.groundMech
+               : introNow==='lance'?PAL.groundLance : PAL.ground;
+  const floorA = introNow==='shop'?PAL.groundAltShop : introNow==='mechanic'?PAL.groundAltMech
+               : introNow==='lance'?PAL.groundAltLance : PAL.groundAlt;
   for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){
     ctx.fillStyle=((c+r)&1)?floorA:floorG;
     ctx.fillRect(tileX(c),tileY(r),TILE,TILE);
@@ -4559,6 +4603,13 @@ cv.addEventListener('click',ev=>{
   if(npcHere){
     if(chebToUnit(S.hero,npcHere)<=1) talkToNpc(npcHere);
     else walkToNpc(npcHere);          // too far to talk — go to them instead
+    return;
+  }
+  // the room's own people: scene-dressing that will still tell you something
+  const decorHere = S.decor && S.decor.find(d=>d.col===t.col&&d.row===t.row);
+  if(decorHere && BYSTANDERS[decorHere.kind]){
+    if(chebToUnit(S.hero,decorHere)<=1) talkToBystander(decorHere);
+    else walkToNpc(decorHere,talkToBystander);
     return;
   }
   if(S.aiming){                                     // committing an aimed skill
