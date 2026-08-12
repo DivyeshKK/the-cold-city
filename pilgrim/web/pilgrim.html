@@ -134,15 +134,25 @@
   @keyframes softpulse{0%,100%{opacity:.45}50%{opacity:.9}}
   @media(prefers-reduced-motion:reduce){.scene .sceneGo{animation:none}}
   .scene .cards{margin-top:16px}
+  /* the shop curtain sits above the main HUD (z-index below), which hides
+     the CREDITS readout while shopping — this mirrors it in the same
+     corner, on top of the curtain, only while a priced menu is open */
+  .scene .sceneCredits{position:absolute;top:8px;right:10px;color:var(--gold);
+    font-size:10px;letter-spacing:.14em;text-transform:uppercase}
 
   /* overlays */
   .curtain{position:absolute;inset:0;display:none;place-items:center;text-align:center;
     background:rgba(8,4,16,.82);backdrop-filter:blur(2px);pointer-events:auto;z-index:10;
     padding:14px;overflow:auto}
   .curtain.show{display:grid}
+  .curtainTitle{font-family:var(--display);font-size:26px;letter-spacing:.22em;text-transform:uppercase;
+    color:var(--ink);margin-bottom:8px}
+  .curtain.win .curtainTitle{color:var(--gold)}
   .poem{font-family:var(--display);font-size:22px;letter-spacing:.18em;line-height:1.8;text-transform:uppercase;
     max-width:80%;margin:0 auto;color:var(--ink)}
   .curtain.win .poem{color:var(--gold)}
+  .curtainSummary{margin-top:14px;font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint)}
+  .curtainSummary b{color:var(--dim);font-weight:600}
   .again{margin-top:14px;font-size:9.5px;letter-spacing:.2em;color:var(--faint);
     text-transform:uppercase}
 
@@ -299,6 +309,7 @@
     </div>
 
     <div class="curtain scene" id="scene">
+      <div class="sceneCredits" id="sceneCredits" style="display:none"></div>
       <div>
         <div class="sceneStage" id="sceneStage"></div>
         <div class="sceneWho" id="sceneWho"></div>
@@ -310,7 +321,9 @@
 
     <div class="curtain" id="curtain">
       <div>
+        <div class="curtainTitle" id="curtainTitle"></div>
         <div class="poem" id="poem"></div>
+        <div class="curtainSummary" id="curtainSummary"></div>
         <div class="again" id="againTxt">CLICK OR PRESS R TO WALK AGAIN</div>
       </div>
     </div>
@@ -2233,6 +2246,32 @@ const SCENE2_SHOP=[
   {who:'Shopkeep', npc:'merch_idle',   line:'“Welcome back!”'},
   {who:'Shopkeep', npc:'merch_tablet', line:'“Here’s the wares for today:”'},
 ];
+/* ============================ PURCHASE GUARD ============================
+   Every purchase in the game — skills, gear, consumables, mechanic services,
+   ramen — must go through here. `afford` flags computed while drawing a row
+   of cards are only a snapshot from render time; if the player buys one card
+   and then clicks another before the row re-renders, a stale snapshot would
+   still read "affordable" even though credits just dropped. trySpend()
+   re-checks the live balance and deducts atomically, so a purchase can never
+   complete for more than the player currently has, and credits can never go
+   negative. */
+function trySpend(price){
+  if((S.credits||0)<price) return false;
+  S.credits-=price;
+  return true;
+}
+/* The shop dialogue is a full-screen curtain that sits above the HUD, so the
+   normal CREDITS readout (#hCredits) is hidden behind it while shopping —
+   this small pill mirrors it on the curtain itself, shown only while a
+   priced menu (cards with prices) is open. */
+function sceneCreditsShow(){
+  const el=document.getElementById('sceneCredits');
+  el.style.display='block';
+  el.innerHTML=`<img class="coinIcon" src="${UI_ICONS.icon_coin}" alt="">CREDITS · ${S.credits||0}`;
+}
+function sceneCreditsHide(){
+  document.getElementById('sceneCredits').style.display='none';
+}
 /* Three unowned skills, priced 14-16 credits — rolled fresh each visit, and
    re-rolled fresh again every time the stall is reopened, so browsing back
    in after buying one doesn't show a card you can no longer afford anyway. */
@@ -2245,6 +2284,7 @@ function rollWares(){
 }
 function renderWaresCards(){
   if(!waresOffer) waresOffer=rollWares();
+  sceneCreditsShow();
   document.getElementById('sceneWho').textContent='Shopkeep';
   const cards=document.getElementById('sceneCards');
   for(const w of waresOffer){
@@ -2256,9 +2296,10 @@ function renderWaresCards(){
       <span class="tag swap"><img class="coinIcon" src="${UI_ICONS.icon_coin}" alt="">${w.price} credits</span>`;
     if(!afford||full) b.style.opacity='.5';
     b.onclick=()=>{
+      if(b.disabled) return;
       if(full){ showNpcPortrait('merch_idle'); typeLine('“Your hands are full, kid. Set something down first.”'); return; }
-      if(!afford){ showNpcPortrait('merch_idle'); typeLine('“Short on credits, kid.”'); return; }
-      S.credits-=w.price;
+      if(!trySpend(w.price)){ showNpcPortrait('merch_idle'); typeLine('“Short on credits, kid.”'); return; }
+      b.disabled=true;
       waresOffer=waresOffer.filter(x=>x!==w);
       grant(w.id);
       showNpcPortrait('merch_book');
@@ -2358,6 +2399,7 @@ const SCENE_SHOP=[
   {who:'Shopkeep', npc:'merch_tablet', line:'“Gear, tonics, or a trick or two — what’ll it be?”'},
 ];
 function renderShopMenu(){
+  sceneCreditsShow();
   document.getElementById('sceneWho').textContent='Shopkeep';
   const cards=document.getElementById('sceneCards'); cards.innerHTML='';
   const mk=(cat,nm,ds,fn)=>{
@@ -2378,6 +2420,7 @@ function renderEquipCards(){
     while(ids.length<3&&src.length) ids.push(src.splice(Math.floor(Math.random()*src.length),1)[0]);
     equipOffer=ids.map(id=>({id,price:randInt(8,12)}));
   }
+  sceneCreditsShow();
   document.getElementById('sceneWho').textContent='Shopkeep';
   const cards=document.getElementById('sceneCards'); cards.innerHTML='';
   const full=equipCount()>=MAX_EQUIP;
@@ -2390,9 +2433,10 @@ function renderEquipCards(){
       <span class="tag swap"><img class="coinIcon" src="${UI_ICONS.icon_coin}" alt="">${w.price} credits</span>`;
     if(!afford||full) b.style.opacity='.5';
     b.onclick=()=>{
+      if(b.disabled) return;
       if(full){ showNpcPortrait('merch_idle'); typeLine('“Three pieces, kid — that’s all you can wear.”'); return; }
-      if(!afford){ showNpcPortrait('merch_idle'); typeLine('“Short on credits, kid.”'); return; }
-      S.credits-=w.price;
+      if(!trySpend(w.price)){ showNpcPortrait('merch_idle'); typeLine('“Short on credits, kid.”'); return; }
+      b.disabled=true;
       equipOffer=equipOffer.filter(x=>x!==w);
       S.hero.equip.push(w.id);
       say(`equipped — ${g.name.toLowerCase()}.`);
@@ -2409,6 +2453,7 @@ function renderEquipCards(){
   cards.appendChild(back);
 }
 function renderShopConsumableCards(){
+  sceneCreditsShow();
   document.getElementById('sceneWho').textContent='Shopkeep';
   const cards=document.getElementById('sceneCards'); cards.innerHTML='';
   const full=S.hero.consumables.length>=MAX_ITEMS;
@@ -2421,9 +2466,10 @@ function renderShopConsumableCards(){
       <span class="tag swap"><img class="coinIcon" src="${UI_ICONS.icon_coin}" alt="">${c.price} credits</span>`;
     if(!afford||full) b.style.opacity='.5';
     b.onclick=()=>{
+      if(b.disabled) return;
       if(full){ showNpcPortrait('merch_idle'); typeLine('“Your hands are full, kid.”'); return; }
-      if(!afford){ showNpcPortrait('merch_idle'); typeLine('“Short on credits, kid.”'); return; }
-      S.credits-=c.price;
+      if(!trySpend(c.price)){ showNpcPortrait('merch_idle'); typeLine('“Short on credits, kid.”'); return; }
+      b.disabled=true;
       S.hero.consumables.push(id);
       showNpcPortrait('merch_book');
       typeLine('“Use it well.”');
@@ -2455,6 +2501,7 @@ const SCENE_TOWN_MECH_REPEAT=[
 const MECH_UPGRADE_COST=6, MECH_LEARN_COST=10, MECH_MAGIC_COST=8;
 const MECH_NOCASH_LINE='“Come back when you’ve got the credits.”';
 function renderTownMechCards(){
+  sceneCreditsShow();
   document.getElementById('sceneWho').textContent='Mechanic';
   const cards=document.getElementById('sceneCards'); cards.innerHTML='';
   const mk=(cat,nm,ds,fn,price)=>{
@@ -2465,7 +2512,9 @@ function renderTownMechCards(){
     b.innerHTML=`<div class="cat">${cat}</div><div class="nm">${nm}</div><div class="ds">${ds}</div>${priceTag}`;
     if(!afford) b.style.opacity='.5';
     b.onclick=()=>{
-      if(!afford){ showNpcPortrait('mech_idle'); typeLine(MECH_NOCASH_LINE); return; }
+      // re-check the live balance, not the render-time snapshot above —
+      // credits may have been spent on another card since this one drew
+      if(price!=null && (S.credits||0)<price){ showNpcPortrait('mech_idle'); typeLine(MECH_NOCASH_LINE); return; }
       fn();
     };
     cards.appendChild(b);
@@ -2473,7 +2522,7 @@ function renderTownMechCards(){
   mk('UPGRADE','Upgrade a Skill','Pick something you carry — more damage, or more range.',renderTownUpgradeCards);
   mk('LEARN','Gain a New Skill','Three options — Second Wind, Teleport, or a road not taken.',renderTownNewSkillCards);
   mk('MAGIC','+2 Max MP','Your well of magic runs deeper, permanently.',()=>{
-    S.credits-=MECH_MAGIC_COST;
+    if(!trySpend(MECH_MAGIC_COST)){ showNpcPortrait('mech_idle'); typeLine(MECH_NOCASH_LINE); return; }
     S.hero.bonusMp+=2; S.hero.mp=Math.min(maxMp(),S.hero.mp+2);
     say('the mechanic tunes something in your chest — +2 max MP.');
     showNpcPortrait('mech_idle'); typeLine('“There. Deeper well.”');
@@ -2482,6 +2531,7 @@ function renderTownMechCards(){
   mk('LEAVE','Walk away','Head back out.',()=>{ closeScene(); updateHud(); });
 }
 function renderTownUpgradeCards(){
+  sceneCreditsShow();
   document.getElementById('sceneWho').textContent='Mechanic';
   const cards=document.getElementById('sceneCards'); cards.innerHTML='';
   const afford=(S.credits||0)>=MECH_UPGRADE_COST;
@@ -2498,8 +2548,7 @@ function renderTownUpgradeCards(){
       b.innerHTML=`<div class="cat">${k.cat}</div><div class="nm">${k.name} — Damage</div><div class="ds">+1 damage, permanently.</div>${priceTag}`;
       if(!afford) b.style.opacity='.5';
       b.onclick=()=>{
-        if((S.credits||0)<MECH_UPGRADE_COST){ showNpcPortrait('mech_idle'); typeLine(MECH_NOCASH_LINE); return; }
-        S.credits-=MECH_UPGRADE_COST;
+        if(!trySpend(MECH_UPGRADE_COST)){ showNpcPortrait('mech_idle'); typeLine(MECH_NOCASH_LINE); return; }
         S.hero.upgrades[id]=S.hero.upgrades[id]||{};
         S.hero.upgrades[id].dmg=(S.hero.upgrades[id].dmg||0)+1;
         say(`${k.name.toLowerCase()} hits harder now.`);
@@ -2513,8 +2562,7 @@ function renderTownUpgradeCards(){
       b.innerHTML=`<div class="cat">${k.cat}</div><div class="nm">${k.name} — Range</div><div class="ds">+1 range, permanently.</div>${priceTag}`;
       if(!afford) b.style.opacity='.5';
       b.onclick=()=>{
-        if((S.credits||0)<MECH_UPGRADE_COST){ showNpcPortrait('mech_idle'); typeLine(MECH_NOCASH_LINE); return; }
-        S.credits-=MECH_UPGRADE_COST;
+        if(!trySpend(MECH_UPGRADE_COST)){ showNpcPortrait('mech_idle'); typeLine(MECH_NOCASH_LINE); return; }
         S.hero.upgrades[id]=S.hero.upgrades[id]||{};
         S.hero.upgrades[id].range=(S.hero.upgrades[id].range||0)+1;
         say(`${k.name.toLowerCase()} reaches further now.`);
@@ -2537,6 +2585,7 @@ function renderTownNewSkillCards(){
     while(ids.length<3&&src.length) ids.push(src.splice(Math.floor(Math.random()*src.length),1)[0]);
     townSkillOffer=ids;
   }
+  sceneCreditsShow();
   document.getElementById('sceneWho').textContent='Mechanic';
   const cards=document.getElementById('sceneCards'); cards.innerHTML='';
   const afford=(S.credits||0)>=MECH_LEARN_COST;
@@ -2547,8 +2596,9 @@ function renderTownNewSkillCards(){
     b.innerHTML=`<div class="cat">${k.cat}</div><div class="nm">${k.name}</div><div class="ds">${k.ds}</div>${priceTag}`;
     if(!afford) b.style.opacity='.5';
     b.onclick=()=>{
-      if((S.credits||0)<MECH_LEARN_COST){ showNpcPortrait('mech_idle'); typeLine(MECH_NOCASH_LINE); return; }
-      S.credits-=MECH_LEARN_COST;
+      if(b.disabled) return;
+      if(!trySpend(MECH_LEARN_COST)){ showNpcPortrait('mech_idle'); typeLine(MECH_NOCASH_LINE); return; }
+      b.disabled=true;
       if(skillFull(id)){ pendingMechPick=id; renderMechReplaceCards(); return; }
       grant(id); townSkillOffer=null;
       showNpcPortrait('mech_idle'); typeLine('“Put that to use.”');
@@ -2575,6 +2625,7 @@ const SCENE_RAMEN_REPEAT=[
 ];
 const RAMEN_NAME={ramen_beef:'Beef',ramen_pork:'Pork',ramen_seafood:'Seafood'};
 function renderRamenCards(){
+  sceneCreditsShow();
   document.getElementById('sceneWho').textContent='Ramen Guy';
   const cards=document.getElementById('sceneCards'); cards.innerHTML='';
   const full=S.hero.consumables.length>=MAX_ITEMS;
@@ -2586,9 +2637,10 @@ function renderRamenCards(){
       <span class="tag swap"><img class="coinIcon" src="${UI_ICONS.icon_coin}" alt="">5 credits</span>`;
     if(!afford||full) b.style.opacity='.5';
     b.onclick=()=>{
+      if(b.disabled) return;
       if(full){ showNpcPortrait('ramen_chef'); typeLine('“HANDS FULL, kid.”'); return; }
-      if(!afford){ showNpcPortrait('ramen_chef'); typeLine('“NO MONEY NO RAMEN.”'); return; }
-      S.credits-=5;
+      if(!trySpend(5)){ showNpcPortrait('ramen_chef'); typeLine('“NO MONEY NO RAMEN.”'); return; }
+      b.disabled=true;
       S.hero.consumables.push(id);
       showNpcPortrait('ramen_chef');
       typeLine('“ENJOY”');
@@ -2640,6 +2692,7 @@ function showNpcPortrait(tokenOrKey){
 }
 function closeScene(){
   document.getElementById('scene').className='curtain scene';
+  sceneCreditsHide();
   const n=talkingNpc(); if(n) n.talkFrame=null;    // back to idle breathing
 }
 /* `endMode` decides what happens once the line-by-line script runs out:
@@ -2793,7 +2846,17 @@ function win(){
 function showCurtain(res,poem){
   const c=document.getElementById('curtain');
   c.className='curtain show '+res;
+  // same win/loss wording already used in the HUD phase readout (hPhase) —
+  // reused here because that label sits behind this very curtain and is
+  // invisible the instant it matters most
+  document.getElementById('curtainTitle').textContent =
+    res==='win' ? 'DISTRICT CLEAR — RUN COMPLETE' : 'FALLEN — RUN OVER';
   document.getElementById('poem').textContent='“'+poem.toUpperCase()+'”';
+  const F=FLOORS[S.floor];
+  const where = F ? F.name : ('LEVEL '+S.floor);
+  const verb = res==='win' ? 'Cleared through' : 'Fell at';
+  document.getElementById('curtainSummary').innerHTML =
+    `${verb} <b>${where}</b> &middot; <b>${S.credits||0}</b> credits collected`;
 }
 
 /* ============================ TUTORIAL BUBBLES ============================
@@ -3031,6 +3094,10 @@ function updateHud(){
   document.getElementById('hFoes').textContent='FOES · '+S.enemies.filter(e=>e.alive).length;
   document.getElementById('hCredits').innerHTML=
     `<img class="coinIcon" src="${UI_ICONS.icon_coin}" alt="">CREDITS · ${S.credits||0}`;
+  // the shop curtain sits above the HUD, so its own credits pill (if open)
+  // needs the same refresh whenever the HUD does
+  const sc=document.getElementById('sceneCredits');
+  if(sc && sc.style.display==='block') sceneCreditsShow();
   pips(document.getElementById('hHp'),h.hp,maxHp(),'','HP');
   pips(document.getElementById('hMp'),h.mp,maxMp(),'mp','MP');
   const boss=S.enemies.find(e=>e.alive&&e.boss);
