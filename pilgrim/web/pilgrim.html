@@ -158,7 +158,10 @@
   @keyframes softpulse{0%,100%{opacity:.45}50%{opacity:.9}}
   @media(prefers-reduced-motion:reduce){.scene .sceneGo{animation:none}}
   .scene .cards{margin-top:16px}
-  /* what you can actually spend, kept on screen the whole time a stall is open */
+  /* The shop curtain sits above the HUD, so the usual CREDITS readout is
+     hidden exactly when it matters most. This restates it on the curtain
+     itself, in the flow above the cards — big, because being able to read
+     your purse at a glance while pricing things up is the whole point. */
   .sceneCredits{display:none;margin-top:14px;font-family:var(--display);
     font-size:24px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);
     text-shadow:0 0 12px rgba(240,201,135,.35)}
@@ -169,9 +172,14 @@
     background:rgba(8,4,16,.82);backdrop-filter:blur(2px);pointer-events:auto;z-index:10;
     padding:14px;overflow:auto}
   .curtain.show{display:grid}
+  .curtainTitle{font-family:var(--display);font-size:26px;letter-spacing:.22em;text-transform:uppercase;
+    color:var(--ink);margin-bottom:8px}
+  .curtain.win .curtainTitle{color:var(--gold)}
   .poem{font-family:var(--display);font-size:22px;letter-spacing:.18em;line-height:1.8;text-transform:uppercase;
     max-width:80%;margin:0 auto;color:var(--ink)}
   .curtain.win .poem{color:var(--gold)}
+  .curtainSummary{margin-top:14px;font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint)}
+  .curtainSummary b{color:var(--dim);font-weight:600}
   .again{margin-top:14px;font-size:9.5px;letter-spacing:.2em;color:var(--faint);
     text-transform:uppercase}
 
@@ -437,7 +445,9 @@
 
     <div class="curtain" id="curtain">
       <div>
+        <div class="curtainTitle" id="curtainTitle"></div>
         <div class="poem" id="poem"></div>
+        <div class="curtainSummary" id="curtainSummary"></div>
         <div class="again" id="againTxt">CLICK OR PRESS R TO WALK AGAIN</div>
       </div>
     </div>
@@ -2608,6 +2618,20 @@ const SCENE2_SHOP=[
   {who:'Shopkeep', npc:'merch_idle',   line:'“Welcome back!”'},
   {who:'Shopkeep', npc:'merch_tablet', line:'“Here’s the wares for today:”'},
 ];
+/* ============================ PURCHASE GUARD ============================
+   Every purchase in the game — skills, gear, consumables, mechanic services,
+   ramen — must go through here. `afford` flags computed while drawing a row
+   of cards are only a snapshot from render time; if the player buys one card
+   and then clicks another before the row re-renders, a stale snapshot would
+   still read "affordable" even though credits just dropped. trySpend()
+   re-checks the live balance and deducts atomically, so a purchase can never
+   complete for more than the player currently has, and credits can never go
+   negative. */
+function trySpend(price){
+  if((S.credits||0)<price) return false;
+  S.credits-=price;
+  return true;
+}
 /* Three unowned skills, priced 14-16 credits — rolled fresh each visit, and
    re-rolled fresh again every time the stall is reopened, so browsing back
    in after buying one doesn't show a card you can no longer afford anyway. */
@@ -2628,9 +2652,10 @@ function renderWaresCards(){
       <div class="ds">${k.ds}</div>
       <span class="tag swap"><img class="coinIcon" src="${UI_ICONS.icon_coin}" alt="">${w.price} credits</span>`;
     b.onclick=()=>{
+      if(b.disabled) return;
       if(full){ showNpcPortrait('merch_idle'); typeLine('“Your hands are full, kid. Set something down first.”'); return; }
-      if(!afford){ showNpcPortrait('merch_idle'); typeLine('“Short on credits, kid.”'); return; }
-      S.credits-=w.price;
+      if(!trySpend(w.price)){ showNpcPortrait('merch_idle'); typeLine('“Short on credits, kid.”'); return; }
+      b.disabled=true;
       waresOffer=waresOffer.filter(x=>x!==w);
       grant(w.id);
       showNpcPortrait('merch_book');
@@ -2761,9 +2786,10 @@ function renderEquipCards(){
       <div class="ds">${g.ds}</div>
       <span class="tag swap"><img class="coinIcon" src="${UI_ICONS.icon_coin}" alt="">${w.price} credits</span>`;
     b.onclick=()=>{
+      if(b.disabled) return;
       if(full){ showNpcPortrait('merch_idle'); typeLine('“Three pieces, kid — set one down first.”'); return; }
-      if(!afford){ showNpcPortrait('merch_idle'); typeLine('“Short on credits, kid.”'); return; }
-      S.credits-=w.price;
+      if(!trySpend(w.price)){ showNpcPortrait('merch_idle'); typeLine('“Short on credits, kid.”'); return; }
+      b.disabled=true;
       equipOffer=equipOffer.filter(x=>x!==w);
       S.hero.equip.push(w.id);
       say(`equipped — ${g.name.toLowerCase()}.`);
@@ -2808,9 +2834,10 @@ function renderShopConsumableCards(){
       <div class="ds">${c.ds}</div>
       <span class="tag swap"><img class="coinIcon" src="${UI_ICONS.icon_coin}" alt="">${c.price} credits</span>`;
     b.onclick=()=>{
+      if(b.disabled) return;
       if(full){ showNpcPortrait('merch_idle'); typeLine('“Your hands are full, kid.”'); return; }
-      if(!afford){ showNpcPortrait('merch_idle'); typeLine('“Short on credits, kid.”'); return; }
-      S.credits-=c.price;
+      if(!trySpend(c.price)){ showNpcPortrait('merch_idle'); typeLine('“Short on credits, kid.”'); return; }
+      b.disabled=true;
       S.hero.consumables.push(id);
       showNpcPortrait('merch_book');
       typeLine('“Use it well.”');
@@ -2867,7 +2894,9 @@ function renderTownMechCards(){
     b.innerHTML=`<div class="cat">${cat}</div><div class="nm">${nm}</div><div class="ds">${ds}</div>${priceTag}`;
     if(!afford) b.classList.add('cant');
     b.onclick=()=>{
-      if(!afford){ showNpcPortrait('mech_idle'); typeLine(MECH_NOCASH_LINE); return; }
+      // re-check the live balance, not the render-time snapshot above —
+      // credits may have been spent on another card since this one drew
+      if(price!=null && (S.credits||0)<price){ showNpcPortrait('mech_idle'); typeLine(MECH_NOCASH_LINE); return; }
       fn();
     };
     cards.appendChild(b);
@@ -2875,7 +2904,7 @@ function renderTownMechCards(){
   mk('UPGRADE','Upgrade a Skill','More damage, or more range, on something you carry.',renderTownUpgradeCards);
   mk('LEARN','Gain a New Skill','One of three you don\'t have yet.',renderTownNewSkillCards);
   mk('MAGIC','+2 Max MP','A deeper well of magic, for the rest of the run.',()=>{
-    S.credits-=MECH_MAGIC_COST;
+    if(!trySpend(MECH_MAGIC_COST)){ showNpcPortrait('mech_idle'); typeLine(MECH_NOCASH_LINE); return; }
     S.hero.bonusMp+=2; S.hero.mp=Math.min(maxMp(),S.hero.mp+2);
     say('the mechanic tunes something in your chest — +2 max MP.');
     showNpcPortrait('mech_idle'); typeLine('“There. Deeper well.”');
@@ -2900,8 +2929,7 @@ function renderTownUpgradeCards(){
       b.innerHTML=`<div class="cat">${k.cat}</div><div class="nm">${k.name} — Damage</div><div class="ds">+1 damage, permanently.</div>${priceTag}`;
       if(!afford) b.classList.add('cant');
       b.onclick=()=>{
-        if((S.credits||0)<MECH_UPGRADE_COST){ showNpcPortrait('mech_idle'); typeLine(MECH_NOCASH_LINE); return; }
-        S.credits-=MECH_UPGRADE_COST;
+        if(!trySpend(MECH_UPGRADE_COST)){ showNpcPortrait('mech_idle'); typeLine(MECH_NOCASH_LINE); return; }
         S.hero.upgrades[id]=S.hero.upgrades[id]||{};
         S.hero.upgrades[id].dmg=(S.hero.upgrades[id].dmg||0)+1;
         say(`${k.name.toLowerCase()} hits harder now.`);
@@ -2915,8 +2943,7 @@ function renderTownUpgradeCards(){
       b.innerHTML=`<div class="cat">${k.cat}</div><div class="nm">${k.name} — Range</div><div class="ds">+1 range, permanently.</div>${priceTag}`;
       if(!afford) b.classList.add('cant');
       b.onclick=()=>{
-        if((S.credits||0)<MECH_UPGRADE_COST){ showNpcPortrait('mech_idle'); typeLine(MECH_NOCASH_LINE); return; }
-        S.credits-=MECH_UPGRADE_COST;
+        if(!trySpend(MECH_UPGRADE_COST)){ showNpcPortrait('mech_idle'); typeLine(MECH_NOCASH_LINE); return; }
         S.hero.upgrades[id]=S.hero.upgrades[id]||{};
         S.hero.upgrades[id].range=(S.hero.upgrades[id].range||0)+1;
         say(`${k.name.toLowerCase()} reaches further now.`);
@@ -2949,8 +2976,9 @@ function renderTownNewSkillCards(){
     b.innerHTML=`<div class="cat">${k.cat}</div><div class="nm">${k.name}</div><div class="ds">${k.ds}</div>${priceTag}`;
     if(!afford) b.classList.add('cant');
     b.onclick=()=>{
-      if((S.credits||0)<MECH_LEARN_COST){ showNpcPortrait('mech_idle'); typeLine(MECH_NOCASH_LINE); return; }
-      S.credits-=MECH_LEARN_COST;
+      if(b.disabled) return;
+      if(!trySpend(MECH_LEARN_COST)){ showNpcPortrait('mech_idle'); typeLine(MECH_NOCASH_LINE); return; }
+      b.disabled=true;
       if(skillFull(id)){ pendingMechPick=id; renderMechReplaceCards(); return; }
       grant(id); townSkillOffer=null;
       showNpcPortrait('mech_idle'); typeLine('“Put that to use.”');
@@ -2988,9 +3016,10 @@ function renderRamenCards(){
       <span class="tag swap"><img class="coinIcon" src="${UI_ICONS.icon_coin}" alt="">5 credits</span>`;
     if(!afford||full) b.classList.add('cant');
     b.onclick=()=>{
+      if(b.disabled) return;
       if(full){ showNpcPortrait('ramen_chef'); typeLine('“HANDS FULL, kid.”'); return; }
-      if(!afford){ showNpcPortrait('ramen_chef'); typeLine('“NO MONEY NO RAMEN.”'); return; }
-      S.credits-=5;
+      if(!trySpend(5)){ showNpcPortrait('ramen_chef'); typeLine('“NO MONEY NO RAMEN.”'); return; }
+      b.disabled=true;
       S.hero.consumables.push(id);
       showNpcPortrait('ramen_chef');
       typeLine('“ENJOY”');
@@ -3236,7 +3265,17 @@ function rollCredits(){
 function showCurtain(res,poem){
   const c=document.getElementById('curtain');
   c.className='curtain show '+res;
+  // same win/loss wording already used in the HUD phase readout (hPhase) —
+  // reused here because that label sits behind this very curtain and is
+  // invisible the instant it matters most
+  document.getElementById('curtainTitle').textContent =
+    res==='win' ? 'DISTRICT CLEAR — RUN COMPLETE' : 'FALLEN — RUN OVER';
   document.getElementById('poem').textContent='“'+poem.toUpperCase()+'”';
+  const F=FLOORS[S.floor];
+  const where = F ? F.name : ('LEVEL '+S.floor);
+  const verb = res==='win' ? 'Cleared through' : 'Fell at';
+  document.getElementById('curtainSummary').innerHTML =
+    `${verb} <b>${where}</b> &middot; <b>${S.credits||0}</b> credits collected`;
 }
 
 /* ============================ TUTORIAL BUBBLES ============================
