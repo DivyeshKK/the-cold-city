@@ -224,6 +224,17 @@
     border:none;box-shadow:none}
   .wrap.titling .titleInner{transform:scale(var(--title-counter,1));
     transform-origin:center center}
+  /* The two reading panels do NOT go full-bleed with the skyline. Counter-
+     scaling them by the same factor lands them back at the stage's own
+     405x720, so they stay a portrait card in the middle of the page at the
+     size the type was drawn for — the alternative was a screen-wide wall of
+     enormous text. The huge shadow spread is what dims everything outside
+     the card, since the panel's own background now only covers the card. */
+  .wrap.titling .curtain.titleCredits{
+    transform:scale(var(--panel-counter,1));
+    transform-origin:center center;
+    box-shadow:0 0 0 4000px rgba(4,2,10,.92);
+    border:1px solid rgba(84,219,214,.16)}
   .curtain.title{z-index:24;backdrop-filter:none;padding:0;
     background:linear-gradient(180deg,rgba(6,3,14,.86) 0%,rgba(6,3,14,.4) 30%,
       rgba(6,3,14,.32) 52%,rgba(6,3,14,.62) 82%,rgba(6,3,14,.92) 100%)}
@@ -3842,6 +3853,9 @@ function win(){
    board turned portrait (it was 12x6 landscape before that); every build
    since is 2.x. Each entry is [number, date, [lines]] — add to the top. */
 const VERSIONS=[
+  ['2.5.2','13 Aug 2026',[
+    'The credits and version history stay a portrait card, sized to fit whatever window they open in',
+  ]],
   ['2.5.1','13 Aug 2026',[
     'The Lance takes up to a quarter of its health from one blow, up from a fifteenth',
   ]],
@@ -5248,6 +5262,13 @@ function fitStage(){
     st.style.setProperty('--stage-x', ((w-STAGE_W*s)/2)+'px');
     st.style.setProperty('--stage-y', ((h-STAGE_H*s)/2)+'px');
     st.style.setProperty('--title-counter', 1/s);
+    // The reading panels want the stage's own 405x720, but never larger than
+    // the window will actually hold — on a phone or a squarish window that
+    // box is bigger than the viewport, and a card you cannot see the edges
+    // of is worse than a smaller one. Capped at 1 so it never grows past
+    // the size the type was drawn for.
+    const fit=Math.min(1, (w*0.94)/STAGE_W, (h*0.94)/STAGE_H);
+    st.style.setProperty('--panel-counter', fit/s);
   } else {
     st.style.setProperty('--stage-scale', w/STAGE_W);
     st.style.setProperty('--stage-x','0px');
