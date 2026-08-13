@@ -3278,17 +3278,17 @@ function win(){
 }
 /* Placeholder billing — real names go in when the team decides the order. */
 const CREDITS=[
-  ['Creators',            ['FIRST LAST','FIRST LAST']],
-  ['Ideation',            ['FIRST LAST','FIRST LAST','FIRST LAST']],
-  ['Artistic Direction',  ['FIRST LAST']],
-  ['Main Artist',         ['FIRST LAST']],
-  ['Additional Art',      ['FIRST LAST','FIRST LAST']],
-  ['Code',                ['FIRST LAST','FIRST LAST']],
-  ['Systems & Balance',   ['FIRST LAST']],
-  ['Writing',             ['FIRST LAST']],
-  ['Sound',               ['FIRST LAST']],
-  ['Feedback & Playtest', ['FIRST LAST','FIRST LAST','FIRST LAST','FIRST LAST']],
-  ['Special Thanks',      ['FIRST LAST','FIRST LAST']],
+  ['Creators',                    ['Joseph Gu','Divyesh Khatri','Emily Su','Xin Clare Yue','Zerui Li']],
+  ['Ideation',                    ['Divyesh Khatri','Joseph Gu','Emily Su']],
+  ['Artistic Direction / Main Artist', ['Emily Su']],
+  ['Additional Art',              ['Joseph Gu']],
+  ['Coding',                      ['Divyesh Khatri','Joseph Gu']],
+  ['Additional Coding',           ['Emily Su']],
+  ['Systems & Balance',           ['Divyesh Khatri','Joseph Gu']],
+  ['Cutscenes',                   ['Joseph Gu']],
+  ['Writing',                     ['Joseph Gu']],
+  ['Music',                       ['Divyesh Khatri']],
+  ['Feedback & Playtest',         ['Zerui Li','Xin Clare Yue','Dana Tô','Abhay Kumaran','Neela Lots','Butch Nasser']],
 ];
 /* The room whites out first, then the credits climb through the white. The
    whiteout stays under them, so nothing cuts hard from board to black. */
@@ -3302,7 +3302,7 @@ function rollCredits(){
       CREDITS.map(([role,people])=>
         `<div class="role">${role}</div>`+
         people.map(p=>`<div class="who">${p}</div>`).join('')).join('')+
-      '<div class="end">Thank you for walking it</div>';
+      '<div class="end">More chapters to come!</div>';
     document.getElementById('credits').className='curtain credits show';
   },1600);
 }
@@ -4718,6 +4718,7 @@ document.getElementById('btnTitleCredits').addEventListener('click',()=>{
     '<div class="title">The Cold City</div>'+
     CREDITS.map(([role,people])=>`<div class="role">${role}</div>`+
       people.map(p=>`<div class="who">${p}</div>`).join('')).join('')+
+    '<div class="role" style="margin-top:44px;color:var(--gold,#f0c987)">More chapters to come!</div>'+
     '<div class="back">Click anywhere to go back</div>';
   elTitleCredits.className='curtain titleCredits show';
 });
