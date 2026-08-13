@@ -788,7 +788,7 @@ const SKILLS={
     ds:'Hit every foe around you. +2 damage, and half of them get shoved back a tile.'},
   incendiary_shot:{cat:'ATTACK',name:'Incendiary Shot',kind:'active',perRound:1,mp:1,atk:true,
     range:2,bonus:1,shape:'single',
-    ds:'Strike 2 tiles away. +1 damage, and a 1-in-5 chance to set the target burning.'},
+    ds:'Strike 2 tiles away. +1 damage, and a 1-in-5 chance to set the target burning — extra damage each round after.'},
 };
 
 /* which skills each level may offer — choices stay narrow early so the first
@@ -2337,7 +2337,7 @@ const SHRINE_ROLLS=[
   {n:'Power of Fire',gain:'+2 DAMAGE / 3 ROUNDS', f:()=>{S.hero.buffs.fire=3;}},
   {n:'Freedom of Wind',gain:'+1 MOVE / 3 ROUNDS', f:()=>{S.hero.buffs.wind=3;}},
   {n:'Whetstone',    gain:'+1 DAMAGE, +1 GUARD', f:()=>{S.hero.buffs.whetstone=999;}},
-  {n:'Poison Heart', gain:'YOUR HITS POISON', f:()=>{S.hero.buffs.poison=3;}},
+  {n:'Poison Heart', gain:'YOUR HITS POISON / 3 ROUNDS', f:()=>{S.hero.buffs.poison=3;}},
   {n:'Swiftness of Lightning',gain:'ARROWS PASS YOU BY / 3 ROUNDS',
    f:()=>{S.hero.buffs.lightning=3;}},
 ];
@@ -3936,6 +3936,15 @@ function drawBoard(now){
       } else doorKey='exit_flash';
     }
     drawShotSpr(doorKey,cx(gc),cyr(gr),false,EXIT_SCALE);
+    // once open, the exit is click-anywhere-to-walk, which is exactly when
+    // showsReach() stops drawing tile rings (a cleared room has no move-budget
+    // tiles to ring) — so without its own cue the door reads as scenery, not
+    // something you can click. Reuse the same ring look reach tiles already use.
+    if(open && S.phase==='player' && !S.over){
+      const b=.5+.35*Math.sin(now/240);
+      ctx.strokeStyle=`rgba(84,219,214,${b.toFixed(2)})`; ctx.lineWidth=1;
+      ctx.strokeRect(tileX(gc)+2.5,tileY(gr)+2.5,TILE-5,TILE-5);
+    }
   }
   // the lance's warnings, and the ground it has already burned
   for(const e of S.enemies){
