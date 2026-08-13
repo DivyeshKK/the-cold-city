@@ -181,6 +181,8 @@
     pointer-events:none;z-index:6;white-space:normal}
   .slotTip b{display:block;text-transform:uppercase;letter-spacing:.06em;
     color:#7a3f9e;font-size:10px;margin-bottom:2px}
+  .slotTip .use{display:block;margin-top:4px;font-size:9.5px;letter-spacing:.1em;
+    text-transform:uppercase;color:#2b7a45}
 
   /* the opening scene: a lone ramen stall (drawn on the canvas, not typed) */
   .scene .sceneStage{font-size:24px;letter-spacing:.3em;margin-bottom:14px}
@@ -561,10 +563,15 @@
     color:var(--dim)}
   /* Salvage armed: every filled item slot re-reads as "trade this in" —
      a danger-tinted border says so before the credits amount does. */
-  .sqSlot.item.salvage:not(.empty){border-style:solid;border-color:var(--danger);
-    background:rgba(255,92,106,.14)}
+  .sqSlot.item.chosen:not(.empty){border-style:solid;border-color:var(--cyan);
+    background:rgba(84,219,214,.16);box-shadow:0 0 0 2px rgba(84,219,214,.25)}
+  /* Salvage is a destructive action, so it reads red — and stays plainly
+     dead until an item is actually selected for it. */
+  #btnSalvage{border-color:rgba(255,92,106,.35);color:#ff9aa4}
   #btnSalvage.armed{border-color:var(--danger);color:#fff;
-    background:rgba(255,92,106,.18)}
+    background:rgba(255,92,106,.2)}
+  #btnSalvage:hover:not(:disabled){border-color:var(--danger);
+    background:rgba(255,92,106,.3);color:#fff}
 
   details{margin-top:12px;border:1px solid var(--edge);background:rgba(22,13,36,.4)}
   summary{cursor:pointer;font-size:10px;letter-spacing:.18em;text-transform:uppercase;
@@ -715,7 +722,7 @@
     <div class="btnGrid">
       <button id="btnEnd">End Turn ␣</button>
       <button id="btnStatus" title="View your equipment and passive skills">Loadout</button>
-      <button id="btnSalvage" title="Trade one carried item for 3 credits">Sell an item</button>
+        <button id="btnSalvage" title="Select a carried item first">Salvage</button>
       <button id="btnRestart">Restart Run</button>
     </div>
   </div>
@@ -1210,13 +1217,33 @@ function useConsumable(id){
    instead of used. A one-shot toggle rather than a standing mode — spend a
    thing and it turns itself back off, so it never lingers waiting to eat a
    click you meant as a normal use. */
-let salvageMode=false;
+/* Which carried item is under the cursor's attention. The first click on a
+   slot selects it and shows what it does; the second uses it. Salvage acts
+   on whatever is selected. Clicking anywhere else lets it go — nothing here
+   commits until you say so twice. */
+let selectedItem=null;
+function selectItem(i){ selectedItem=i; renderSlotBar(); }
+function clearItemSelection(){
+  if(selectedItem===null) return;
+  selectedItem=null; hideSlotTip(); renderSlotBar();
+}
 function toggleSalvage(){
-  if(salvageMode){ salvageMode=false; say('never mind.'); renderSlotBar(); return; }
-  if(!S.hero.consumables.length){ say('you are carrying nothing to sell.'); return; }
-  salvageMode=true;
-  say(`pick an item below to sell for ${SALVAGE_RATE} credits — or press the button again to cancel.`);
-  renderSlotBar();
+  const h=S.hero;
+  if(selectedItem===null){ say('pick an item first — then salvage it.'); return; }
+  const id=h.consumables[selectedItem];
+  if(!id){ clearItemSelection(); return; }
+  if(!canSalvage(id)){
+    say(`the ${CONSUMABLES[id].name.toLowerCase()} is money — there's nothing to break it down into.`);
+    return;
+  }
+  const val=salvageValue(id);
+  h.consumables.splice(selectedItem,1);
+  S.credits=(S.credits||0)+val;
+  // paid out the same way a kill is, so the credits line jumping has a cause
+  spawnCreditSplash(h.col,h.row,val);
+  say(`salvaged ${CONSUMABLES[id].name.toLowerCase()} — +${val} credits.`);
+  selectedItem=null; hideSlotTip();
+  updateHud(); renderSlotBar();
 }
 
 /* Loadout: a read-only look at gear bought from the Shopkeep and passives
@@ -4110,6 +4137,12 @@ function win(){
    board turned portrait (it was 12x6 landscape before that); every build
    since is 2.x. Each entry is [number, date, [lines]] — add to the top. */
 const VERSIONS=[
+  ['2.7.1','13 Aug 2026',[
+    'The run buttons sit as one block the width of the board, and the whole screen fits again',
+    'The SAFE / IN COMBAT badge moved to the top of the board, centred',
+    'Clicking a carried item shows what it does; clicking it again uses it, and clicking away forgets it',
+    'Salvage is a red button that stays dead until you have selected something to break down',
+  ]],
   ['2.7.0','13 Aug 2026',[
     'Fireball no longer sails through walls',
     'A SAFE / IN COMBAT badge, and no more "click a glowing tile" on empty floors',
@@ -4762,9 +4795,10 @@ function useActive(id){
 /* Two yellow ACTION slots (the active skills you can trigger — same click,
    uses-left and MP-cost logic the old text buttons had) and three purple
    ITEM slots (reserved; nothing occupies these yet). */
-function showSlotTip(btn,c){
+function showSlotTip(btn,c,pinned){
   const tip=document.getElementById('slotTip'); if(!tip) return;
-  tip.innerHTML=`<b>${c.name}</b>${c.ds}`;
+  tip.innerHTML=`<b>${c.name}</b>${c.ds}`+
+    (pinned?'<span class="use">Click again to use it</span>':'');
   tip.style.left=(btn.offsetLeft+btn.offsetWidth/2)+'px';
   tip.style.display='block';
 }
@@ -4811,47 +4845,38 @@ function renderSlotBar(){
       d.textContent='—'; el.appendChild(d); continue;
     }
     const c=CONSUMABLES[id];
-    const b=document.createElement('button'); b.className='sqSlot item'+(salvageMode?' salvage':'');
+    const chosen = selectedItem===i;
+    const b=document.createElement('button');
+    b.className='sqSlot item'+(chosen?' chosen':'');
     b.innerHTML=`<img src="${itemIcon(c.icon)}" alt="">`+
       `<div class="nm">${c.name}</div>`;
     b.disabled = !playing;
-    if(salvageMode){
-      const val=salvageValue(id), sellable=canSalvage(id);
-      b.title = sellable ? `Salvage ${c.name} — +${val} credits`
-                         : `${c.name} can't be salvaged — it already is money`;
-      if(!sellable) b.classList.add('nosell');
-      b.onclick=()=>{
-        if(!sellable){ say(`the ${c.name.toLowerCase()} is money — there's nothing to break it down into.`); return; }
-        h.consumables.splice(i,1);
-        S.credits=(S.credits||0)+val;
-        // paid out the same way a kill is, so the credits line jumping has a
-        // cause you can see
-        spawnCreditSplash(h.col,h.row,val);
-        say(`salvaged ${c.name.toLowerCase()} — +${val} credits.`);
-        salvageMode=false;
-        updateHud(); renderSlotBar();
-      };
-    } else {
-      b.title=`${c.name} — ${c.ds}`;
-      b.onclick=()=>{
-        h.consumables.splice(i,1);
-        useConsumable(id);
-      };
-    }
-    b.onmouseenter=()=>showSlotTip(b,c);
-    b.onmouseleave=hideSlotTip;
-    b.onfocus=()=>showSlotTip(b,c);
-    b.onblur=hideSlotTip;
+    b.title = chosen ? `${c.name} — click again to use it` : `${c.name} — ${c.ds}`;
+    // first click reads it, second click drinks it
+    b.onclick=ev=>{
+      ev.stopPropagation();                 // don't let the page-level cancel see this
+      if(chosen){ h.consumables.splice(i,1); selectedItem=null; hideSlotTip(); useConsumable(id); }
+      else { selectItem(i); }
+    };
+    b.onmouseenter=()=>{ if(selectedItem===null) showSlotTip(b,c); };
+    b.onmouseleave=()=>{ if(selectedItem===null) hideSlotTip(); };
     el.appendChild(b);
+    // a chosen item keeps its description up, rather than needing a hover.
+    // Called straight away, not on a frame callback — the button is already
+    // in the DOM and laid out, and a rAF here would simply never fire if the
+    // tab were backgrounded.
+    if(chosen) showSlotTip(b,c,true);
   }
   const salvageBtn=document.getElementById('btnSalvage');
   if(salvageBtn){
-    salvageBtn.classList.toggle('armed',salvageMode);
-    salvageBtn.textContent = salvageMode? 'Cancel — pick an item' : 'Sell an item';
-    salvageBtn.disabled = !playing || !h.consumables.length;
-    salvageBtn.title = h.consumables.length
-      ? `Trade one carried item for ${SALVAGE_RATE} credits`
-      : 'Nothing to sell';
+    // dead until something is actually selected to break down
+    const id = selectedItem!==null ? h.consumables[selectedItem] : null;
+    const can = !!id && canSalvage(id);
+    salvageBtn.classList.toggle('armed', can);
+    salvageBtn.disabled = !playing || !can;
+    salvageBtn.title = !id ? 'Select a carried item first'
+      : can ? `Break down ${CONSUMABLES[id].name} for ${SALVAGE_RATE} credits`
+            : `${CONSUMABLES[id].name} can't be broken down`;
   }
 }
 
@@ -5782,7 +5807,12 @@ cv.addEventListener('click',ev=>{
 document.getElementById('curtain').addEventListener('click',restart);
 document.getElementById('btnEnd').onclick=endTurn;
 document.getElementById('btnStatus').onclick=openStatusPanel;
-document.getElementById('btnSalvage').onclick=toggleSalvage;
+document.getElementById('btnSalvage').onclick=ev=>{ ev.stopPropagation(); toggleSalvage(); };
+/* Anywhere else is "never mind" — the board, the HUD, the page around it. */
+document.addEventListener('click',ev=>{
+  if(ev.target.closest('#slotBarWrap')||ev.target.closest('#btnSalvage')) return;
+  clearItemSelection();
+});
 document.getElementById('btnRestart').onclick=restart;
 document.getElementById('btnRestart').innerHTML=
   `<img class="btnIcon" src="${UI_ICONS.icon_restart}" alt="">Restart`;
@@ -5825,7 +5855,7 @@ function restart(){
   const endCard=document.getElementById('endCard');
   endCard.classList.remove('active'); endCard.onclick=null;
   document.getElementById('bossTitle').classList.remove('play');
-  salvageMode=false; tutClickTarget=null;
+  selectedItem=null; tutClickTarget=null;
   loadFloor(0);
 }
 /* Out of the credits and back to the title, rather than straight into another
