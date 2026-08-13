@@ -54,7 +54,8 @@
     border:1px solid var(--edge);background:#080410;overflow:hidden;
     box-shadow:0 0 0 1px rgba(0,0,0,.6),0 24px 60px -30px rgba(0,0,0,.9)}
   .stage{position:absolute;top:0;left:0;width:405px;height:720px;
-    transform-origin:0 0;transform:scale(var(--stage-scale,1));
+    transform-origin:0 0;
+    transform:translate(var(--stage-x,0px),var(--stage-y,0px)) scale(var(--stage-scale,1));
     background:#080410;overflow:hidden}
   canvas{position:absolute;inset:0;width:100%;height:100%;display:block;
     image-rendering:pixelated;image-rendering:crisp-edges}
@@ -211,6 +212,18 @@
      has to be hidden until then, or it shows through the gradient. */
   .wrap.titling .hud, .wrap.titling #bubbles, .wrap.titling .slotBar,
   .wrap.titling .bar, .wrap.titling details, .wrap.titling .titlebar{display:none}
+  /* The title owns the whole page. The stage breaks out of its phone-shaped
+     frame and the skyline is scaled to COVER the viewport (cropping the
+     overflow) rather than fit inside it, so there are no bars down the
+     sides. The type is counter-scaled by the same factor — otherwise the
+     name would balloon to the width of a desktop monitor along with the
+     art it is sitting on. */
+  .wrap.titling{padding:0;max-width:none}
+  .wrap.titling .stageWrap{position:fixed;inset:0;margin:0;
+    width:100vw;height:100dvh;max-width:none;aspect-ratio:auto;
+    border:none;box-shadow:none}
+  .wrap.titling .titleInner{transform:scale(var(--title-counter,1));
+    transform-origin:center center}
   .curtain.title{z-index:24;backdrop-filter:none;padding:0;
     background:linear-gradient(180deg,rgba(6,3,14,.86) 0%,rgba(6,3,14,.35) 34%,
       rgba(6,3,14,0) 52%,rgba(6,3,14,.55) 82%,rgba(6,3,14,.92) 100%)}
@@ -229,6 +242,18 @@
     background:rgba(12,7,22,.8);border-color:rgba(84,219,214,.35)}
   .titleBtn:hover:not(:disabled){background:rgba(84,219,214,.16)}
   /* the nag: snaps in on the 20th click, then takes its time going away */
+  .titleBtns.titleBtnsSub{margin-top:10px}
+  /* The version log reads as a list rather than a roll of names, so it is
+     left-aligned inside a column that stays narrow on a wide screen. */
+  .tvLog{max-width:440px;margin:0 auto;text-align:left}
+  .tvLog .ver{display:flex;align-items:baseline;gap:10px;margin:30px 0 8px;
+    border-bottom:1px solid rgba(255,255,255,.14);padding-bottom:6px}
+  .tvLog .ver .num{font-family:var(--display);font-size:17px;letter-spacing:.16em;color:#fff}
+  .tvLog .ver .when{font-size:8.5px;letter-spacing:.2em;text-transform:uppercase;
+    color:rgba(255,255,255,.4)}
+  .tvLog li{font-size:12.5px;line-height:1.65;color:rgba(255,255,255,.82);
+    margin:0 0 5px 0}
+  .tvLog ul{margin:0;padding-left:17px}
   .titleNag{display:inline-block;margin-top:22px;opacity:0;
     font-size:11px;letter-spacing:.1em;color:var(--dim);
     border:1px solid var(--edge);background:rgba(8,4,16,.9);padding:7px 12px;
@@ -597,11 +622,17 @@
           <button class="titleBtn" id="btnPlay">Play</button>
           <button class="titleBtn" id="btnTitleCredits">View Credits</button>
         </div>
+        <div class="titleBtns titleBtnsSub">
+          <button class="titleBtn" id="btnVersions">Version History</button>
+        </div>
         <div><div class="titleNag" id="titleNag">hey, stop that.</div></div>
       </div>
     </div>
     <div class="curtain titleCredits" id="titleCredits">
       <div class="tcRoll" id="tcRoll"></div>
+    </div>
+    <div class="curtain titleCredits versions" id="titleVersions">
+      <div class="tcRoll" id="tvRoll"></div>
     </div>
     <div class="fader" id="fader"></div>
   </div>
@@ -1058,7 +1089,12 @@ function useConsumable(id){
     for(const e of S.enemies) if(e.alive) hurtEnemy(e,15);
     if(!S.enemies.some(e=>e.alive) && !S.over){ updateHud(); renderSlotBar(); afterLastKill(); return; }
   }
-  else if(id==='black_card'){ S.credits=(S.credits||0)+20; say('the card drains clean — 20 credits.'); }
+  else if(id==='black_card'){
+    S.credits=(S.credits||0)+20;
+    // pays out on screen like anything else that earns credits
+    spawnCreditSplash(h.col,h.row,20);
+    say('the card drains clean — 20 credits.');
+  }
   updateHud(); renderSlotBar();
 }
 
@@ -3611,6 +3647,50 @@ function win(){
   for(let i=0;i<6;i++) setTimeout(()=>{ if(gen===S.gen) shake(9-i); }, i*180);
   setTimeout(()=>{ if(gen===S.gen) playEndSequence(); }, 1200);
 }
+/* Version history, newest first. 1.0.0 is everything up to the point the
+   board turned portrait (it was 12x6 landscape before that); every build
+   since is 2.x. Each entry is [number, date, [lines]] — add to the top. */
+const VERSIONS=[
+  ['2.4.0','13 Aug 2026',[
+    'Seven new items: enhancers, HP battery, modified parts, book of demons, black gold card',
+    'Shrines now drop an item instead of a temporary buff, and appear at random — more often in boss rooms',
+    'Salvage any carried item for credits',
+    'Bonus health is now a shield, shown as yellow bars',
+    'Both healing skills removed — healing comes from items now',
+    'The Mechanic\u2019s skills work once a floor, and his upgrades are one per floor',
+    'Return Fire, Incendiary Shot, Teleport and Essence of Vitality reworked',
+    'Boss arenas announce themselves by name',
+    'The Lance can\u2019t lose more than 15% of its health to a single blow',
+  ]],
+  ['2.3.0','12 Aug 2026',[
+    'Title screen, and the real credits',
+    'The Lance\u2019s second phase, and a new Pilgrim',
+    'The win ending, told a line at a time',
+    'Bystanders with something to say',
+    'Clearer playtest feedback, and fixes to shop credits',
+  ]],
+  ['2.2.0','11 Aug 2026',[
+    'The bow\u2019s ranged rules: line of sight, and less damage at distance',
+    'Enemies scale with the floor',
+    'Agent 180 reworked — a darker, larger arena',
+    'Equipment rework, and the burning trash fixed',
+  ]],
+  ['2.1.0','10 Aug 2026',[
+    'Act 1 rebuilt: the full level order, the Shop and the Town',
+    'Tutorial boxes you dismiss yourself, and that only speak when they are true',
+    'Hints point at the thing they are about',
+  ]],
+  ['2.0.0','8 Aug 2026',[
+    'The board turns portrait — 6 wide by 12 deep, sized to whatever it is played on',
+    'One source of truth, built for deploy',
+  ]],
+  ['1.0.0','\u2013 7 Aug 2026',[
+    'The landscape build: a 12 by 6 board',
+    'Turn-based tactical combat, the 12-level structure and its gated skill pools',
+    'The team\u2019s hero and enemy art, the opening scene, the Lance',
+    'A difficulty model, and a tutorial built on George Fan\u2019s principles',
+  ]],
+];
 /* Placeholder billing — real names go in when the team decides the order. */
 const CREDITS=[
   ['Creators',                    ['Joseph Gu','Divyesh Khatri','Emily Su','Xin Clare Yue','Zerui Li']],
@@ -4949,10 +5029,23 @@ const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
    CSS can size the wrapper but can't turn that width into the unitless
    factor a transform needs, so the one number comes from here. */
 const STAGE_W=405;
+const STAGE_H=720;
 function fitStage(){
   const wrap=document.getElementById('stageWrap'); if(!wrap) return;
-  const w=wrap.clientWidth; if(!w) return;
-  document.getElementById('stage').style.setProperty('--stage-scale', w/STAGE_W);
+  const st=document.getElementById('stage');
+  const w=wrap.clientWidth, h=wrap.clientHeight; if(!w) return;
+  if(titleMode){
+    // cover: the larger of the two ratios, then centre what spills over
+    const s=Math.max(w/STAGE_W, h/STAGE_H);
+    st.style.setProperty('--stage-scale', s);
+    st.style.setProperty('--stage-x', ((w-STAGE_W*s)/2)+'px');
+    st.style.setProperty('--stage-y', ((h-STAGE_H*s)/2)+'px');
+    st.style.setProperty('--title-counter', 1/s);
+  } else {
+    st.style.setProperty('--stage-scale', w/STAGE_W);
+    st.style.setProperty('--stage-x','0px');
+    st.style.setProperty('--stage-y','0px');
+  }
 }
 addEventListener('resize',fitStage);
 if(window.ResizeObserver) new ResizeObserver(fitStage).observe(document.getElementById('stageWrap'));
@@ -5166,6 +5259,7 @@ function toTitle(){
     titleMode=true;
     document.getElementById('wrap').classList.add('titling');
     elTitle.className='curtain title show';
+    fitStage();                                  // full-bleed again
     setTimeout(()=>elFader.classList.remove('on'),80);
   },760);
 }
@@ -5202,6 +5296,7 @@ document.getElementById('btnPlay').addEventListener('click',()=>{
     titleMode=false;
     elTitle.className='curtain title';
     document.getElementById('wrap').classList.remove('titling');
+    fitStage();                                  // back into the framed board
     restart();                                   // floor 0, built behind the black
     setTimeout(()=>elFader.classList.remove('on'),80);
   },760);
@@ -5217,6 +5312,17 @@ document.getElementById('btnTitleCredits').addEventListener('click',()=>{
   elTitleCredits.className='curtain titleCredits show';
 });
 elTitleCredits.addEventListener('click',()=>{ elTitleCredits.className='curtain titleCredits'; });
+const elTitleVersions=document.getElementById('titleVersions');
+document.getElementById('btnVersions').addEventListener('click',()=>{
+  document.getElementById('tvRoll').innerHTML=
+    '<div class="title">Version History</div><div class="tvLog">'+
+    VERSIONS.map(([num,when,lines])=>
+      `<div class="ver"><span class="num">${num}</span><span class="when">${when}</span></div>`+
+      '<ul>'+lines.map(l=>`<li>${l}</li>`).join('')+'</ul>').join('')+
+    '</div><div class="back">Click anywhere to go back</div>';
+  elTitleVersions.className='curtain titleCredits versions show';
+});
+elTitleVersions.addEventListener('click',()=>{ elTitleVersions.className='curtain titleCredits versions'; });
 
 restart();                                       // loadFloor(0) builds the background and particles itself
 buildTitleCity();
