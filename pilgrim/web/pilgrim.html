@@ -193,6 +193,11 @@
     background:rgba(8,4,16,.82);backdrop-filter:blur(2px);pointer-events:auto;z-index:10;
     padding:14px;overflow:auto}
   .curtain.show{display:grid}
+  /* Loadout reads as a temporary overlay, not a competing screen — it needs
+     to sit visibly above the draft and the Shopkeep's scene (both plain
+     .curtain, z-index 10) without touching either's own markup, so closing
+     it leaves whatever was underneath exactly as it was. */
+  #statusPanel{z-index:15}
   .curtainTitle{font-family:var(--display);font-size:26px;letter-spacing:.22em;text-transform:uppercase;
     color:var(--ink);margin-bottom:8px}
   .curtain.win .curtainTitle{color:var(--gold)}
@@ -1206,11 +1211,11 @@ function renderStatusCards(){
     cards.appendChild(d);
   }
 }
-// Guards against stacking on top of the draft/scene/win curtains, which
-// share the same overlay layer — this one only opens when none of them do.
+// Meant to open ON TOP of the draft and the Shopkeep's scene — that's the
+// whole point, checking a piece of gear before picking a skill or spending
+// credits shouldn't mean backing out first. It only refuses to open over
+// the win/lose poem, where there's nothing left to decide.
 function openStatusPanel(){
-  if(sceneShowing()) return;
-  if(document.getElementById('draft').className.includes('show')) return;
   if(document.getElementById('curtain').className.includes('show')) return;
   renderStatusCards();
   document.getElementById('statusPanel').className='curtain show';
