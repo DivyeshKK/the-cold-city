@@ -48,7 +48,13 @@
      so scaling the whole thing as one unit is the only way its text stays
      laid out the way it was drawn — shrinking the box alone made the round
      counter collide with the HP pips on anything phone-sized. */
-  :root{--chrome:201px}
+  /* Everything above and below the board. The run buttons are two rows now,
+     not one, so this carries ~44px more than it used to — get this wrong and
+     the board is sized for a viewport taller than the one it's in, and the
+     bottom row falls off the screen. It stays a constant on purpose: the slot
+     squares are sized from it and are square, so measuring it at runtime
+     would feed straight back into itself. */
+  :root{--chrome:245px}
   .stageWrap{position:relative;margin:0 auto;aspect-ratio:180/320;
     width:min(100%, 405px, calc((100dvh - var(--chrome)) * 0.5));
     border:1px solid var(--edge);background:#080410;overflow:hidden;
@@ -94,6 +100,14 @@
     font-size:12px;line-height:1.6;max-width:66%;letter-spacing:.08em}
   .hud .math b{color:var(--gold);font-weight:600}
   .hud .phase{font-family:var(--display);position:absolute;bottom:8px;right:10px;color:var(--cyan);font-size:13px;font-weight:600}
+  /* the one thing worth knowing at a glance: is anything trying to kill me.
+     Centred at the top, between the round counter and the pilgrim's bars. */
+  .hud .zone{position:absolute;top:7px;left:50%;transform:translateX(-50%);
+    font-size:8px;letter-spacing:.2em;padding:2px 7px;
+    border:1px solid rgba(120,230,170,.4);
+    color:#8fe6b4;background:rgba(30,90,60,.25)}
+  .hud .zone.hot{border-color:rgba(255,92,106,.5);color:#ff9aa4;
+    background:rgba(90,25,35,.3)}
   .hud .phase.enemy{color:var(--magenta)}
 
   /* speech bubbles — anchored to the thing they describe */
@@ -170,8 +184,8 @@
 
   /* the opening scene: a lone ramen stall (drawn on the canvas, not typed) */
   .scene .sceneStage{font-size:24px;letter-spacing:.3em;margin-bottom:14px}
-  .scene .sceneWho{font-family:var(--display);font-size:9px;letter-spacing:.28em;text-transform:uppercase;
-    color:var(--gold);margin-bottom:8px}
+  .scene .sceneWho{font-family:var(--display);font-size:14px;letter-spacing:.22em;text-transform:uppercase;
+    color:var(--gold);margin-bottom:9px}
   .scene .sceneLine{font-size:13px;line-height:1.85;color:var(--ink);
     max-width:440px;margin:0 auto;min-height:52px;letter-spacing:.03em}
   .scene .sceneGo{margin-top:16px;font-size:8.5px;letter-spacing:.24em;
@@ -425,7 +439,13 @@
     padding:10px;text-align:left;cursor:pointer;transition:border-color .15s,transform .15s;
     font-family:inherit;color:var(--ink);position:relative}
   .card:hover,.card:focus-visible{border-color:var(--cyan);transform:translateY(-2px);outline:none}
-  .card .cat{font-size:8px;letter-spacing:.2em;text-transform:uppercase;color:var(--faint)}
+  .card .cat{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);font-weight:600}
+  /* the run's actual numbers, above the gear that produced them */
+  .statSheet{grid-column:1/-1;border:1px solid var(--edge);background:rgba(8,4,16,.5);
+    padding:10px 13px;margin-bottom:4px}
+  .statRow{display:flex;justify-content:space-between;gap:14px;
+    font-size:12px;line-height:1.95;letter-spacing:.04em;color:var(--dim)}
+  .statRow b{color:var(--ink);font-weight:600}
   .card .nm{font-family:var(--display);font-size:15px;letter-spacing:.1em;text-transform:uppercase;
     color:var(--gold);margin:4px 0 5px;font-weight:600}
   .card .ds{font-size:13px;line-height:1.5;color:var(--dim);text-transform:none;
@@ -469,11 +489,27 @@
     text-transform:uppercase;color:var(--faint);line-height:1.8;max-width:560px;
     margin-left:auto;margin-right:auto}
   .draftOwned b{color:var(--dim);font-weight:600}
+  /* what you're choosing FOR — drafting blind is a guess; naming what waits
+     on the other side of the door (and holding one card back) makes it a
+     decision. */
+  .nextHint{margin-top:15px;font-size:9.5px;letter-spacing:.18em;
+    text-transform:uppercase;color:var(--faint)}
+  .nextHint b{color:var(--gold);font-weight:600}
   button.skip{margin-top:12px;font-size:9px;letter-spacing:.16em;
     border-color:rgba(203,185,220,.2);color:var(--dim);padding:8px 14px}
   button.skip:hover{border-color:var(--cyan);color:#fff}
 
-  .bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+  .bar{display:flex;flex-direction:column;gap:8px;align-items:center;margin-top:12px}
+  /* The four run buttons sit as one block the width of the board, rather than
+     drifting to opposite ends of the page — the slot bar above them is the
+     same width, so the whole lower half reads as one panel. */
+  .btnGrid{display:grid;grid-template-columns:1fr 1fr;gap:6px;
+    width:min(100%, 405px, calc((100dvh - var(--chrome)) * 0.5));margin:0 auto}
+  /* one fixed height for all four — the Restart button carries an icon and
+     would otherwise sit 2px taller than the row above it */
+  .btnGrid button{width:100%;padding:0 4px;height:36px;white-space:nowrap;
+    display:flex;align-items:center;justify-content:center;gap:5px;
+    font-size:clamp(9px,2.4vw,11px);letter-spacing:.08em}
   button{font-family:inherit;font-size:12px;letter-spacing:.14em;text-transform:uppercase;
     color:var(--ink);background:var(--panel);border:1px solid var(--edge);
     padding:9px 13px;cursor:pointer;transition:border-color .15s,color .15s,background .15s}
@@ -548,7 +584,7 @@
   /* Phones and short windows: strip the page furniture so the board itself
      keeps as much of the viewport as possible. --chrome drops to match. */
   @media (max-height:760px), (max-width:560px){
-    :root{--chrome:155px}
+    :root{--chrome:199px}
     .wrap{padding:8px 8px 12px}
     .titlebar{margin-bottom:6px}
     .titlebar h1{font-size:17px;letter-spacing:.18em}
@@ -567,6 +603,7 @@
   <div class="stage" id="stage">
     <canvas id="cv" width="360" height="640"></canvas>
     <div class="hud">
+      <div class="zone" id="hZone"></div>
       <div class="tl">
         <div><b id="hRound">ROUND 1</b></div>
         <div id="hFoes">FOES · 1</div>
@@ -596,6 +633,7 @@
         <div class="draftWarn" id="draftWarn"></div>
         <div class="cards" id="cards"></div>
         <div class="draftOwned" id="draftOwned"></div>
+        <div class="nextHint" id="nextHint"></div>
         <button class="skip" id="btnSkip">Keep what I have — take nothing</button>
       </div>
     </div>
@@ -674,11 +712,12 @@
 
   <div class="bar">
     <span id="strikeBtns" class="strikeRow"></span>
-    <button id="btnEnd">End Turn ␣</button>
-    <div class="spacer"></div>
-    <button id="btnStatus" title="View your equipment and passive skills">Loadout</button>
-    <button id="btnSalvage" title="Trade a carried item for credits">Salvage</button>
-    <button id="btnRestart">Restart Run</button>
+    <div class="btnGrid">
+      <button id="btnEnd">End Turn ␣</button>
+      <button id="btnStatus" title="View your equipment and passive skills">Loadout</button>
+      <button id="btnSalvage" title="Trade one carried item for 3 credits">Sell an item</button>
+      <button id="btnRestart">Restart Run</button>
+    </div>
   </div>
 
   <details>
@@ -933,8 +972,10 @@ const SKILLS={
 
   power_strike:{cat:'ATTACK',name:'Power Strike',kind:'passive',
     ds:'+2 damage on every strike.',mod:{extra:2}},
-  quick_move:{cat:'ATTACK',name:'Quick Move',kind:'passive',
-    ds:'Move 2 tiles instead of 1.',mod:{move:1}},
+  /* Was a second tile of movement, which the Speed Boots already sell. As an
+     active it does something the boots can't: buys a whole round. */
+  quick_move:{cat:'DEFEND',name:'Quick Move',kind:'active',perFloor:1,mp:2,
+    ds:'Slip away. The enemies lose their next turn entirely.'},
   shield_block:{cat:'DEFEND',name:'Shield Block',kind:'passive',
     ds:'Take 2 less damage per hit.',mod:{def:2}},
   dodge:{cat:'DEFEND',name:'Dodge',kind:'active',mp:1,
@@ -962,7 +1003,7 @@ const SKILLS={
     ds:'One heavy blow. +3 damage.'},
 
   bow:{cat:'GEAR',name:'Bow',kind:'passive',
-    ds:'Strike from 3 tiles away.',mod:{range:2},grants:'ranged'},
+    ds:'Strike from 3 tiles away. Half damage past the first tile.',mod:{range:2},grants:'ranged'},
   magic_staff:{cat:'GEAR',name:'Magic Staff',kind:'passive',
     ds:'+1 range. Spells cost 1 less.',mod:{range:1,mpCut:1},grants:'ranged'},
   armor:{cat:'GEAR',name:'Armor',kind:'passive',
@@ -973,7 +1014,7 @@ const SKILLS={
   magic_heart:{cat:'GEAR',name:'Magic Heart',kind:'passive',
     ds:'+1 max MP.',mod:{mp:1}},
   vitality:{cat:'GEAR',name:'Essence of Vitality',kind:'passive',
-    ds:'+1 max HP, and a 1-in-5 chance to mend 1 each round.',mod:{hp:1}},
+    ds:'+1 max HP, and a 1-in-5 chance to heal 1 each round.',mod:{hp:1}},
 
   /* --- the Mechanic's favor: three skills found nowhere else --- */
   /* The Mechanic's three are per-FLOOR, not per-round — one shot each between
@@ -1086,9 +1127,9 @@ const CONSUMABLES={
   super_enhancer:{name:'Super Enhancer', icon:'icon_supermedal', price:9,
     ds:'+3 damage, for 3 rounds.'},
   hp_battery:{name:'HP Battery', icon:'icon_hpbattery', price:6,
-    ds:'Mends 1 a round until you are whole again.'},
+    ds:'Heals 1 a round until you are back to full.'},
   tech_parts:{name:'Modified Parts', icon:'icon_techparts', price:7,
-    ds:'Permanently improves one piece of gear you carry.'},
+    ds:'Permanently improves one piece of equipment you are wearing.'},
   demon_book:{name:'Book of Demons', icon:'icon_demonbook', price:8,
     ds:'Costs 70% of your health. Deals 15 to every foe on the floor.'},
   black_card:{name:'Black Gold Card', icon:'icon_blackcard', price:3,
@@ -1142,7 +1183,7 @@ function useConsumable(id){
   else if(id==='super_enhancer'){ h.buffs.surge=3; say('the medallion burns hot — your blows land like hammers.'); }
   else if(id==='hp_battery'){
     h.mending=true;                       // 1 a round, and it keeps going until full
-    say('the battery clicks on — it will keep working at you.');
+    say('the battery clicks on — it will keep healing you each round.');
   }
   else if(id==='tech_parts'){ upgradeSomeGear(); }
   else if(id==='demon_book'){
@@ -1171,10 +1212,10 @@ function useConsumable(id){
    click you meant as a normal use. */
 let salvageMode=false;
 function toggleSalvage(){
-  if(salvageMode){ salvageMode=false; renderSlotBar(); return; }
-  if(!S.hero.consumables.length){ say('nothing carried to salvage.'); return; }
+  if(salvageMode){ salvageMode=false; say('never mind.'); renderSlotBar(); return; }
+  if(!S.hero.consumables.length){ say('you are carrying nothing to sell.'); return; }
   salvageMode=true;
-  say('choose an item to salvage for credits.');
+  say(`pick an item below to sell for ${SALVAGE_RATE} credits — or press the button again to cancel.`);
   renderSlotBar();
 }
 
@@ -1184,8 +1225,28 @@ function toggleSalvage(){
    what a piece of gear does mid-run short of walking back to the merchant.
    Just a look, never an action — Set It Down stays on the Shopkeep's
    management screens, not here. */
+/* The numbers the game has always run on, finally written down. Everything
+   here is read live through the same helpers combat uses, so it can't drift
+   from what actually happens when you swing. */
+function statLines(){
+  const h=S.hero, m=mods(), p=heroProfile();
+  const arm=Math.round(armourCut()*100);
+  return [
+    ['Health',        `${h.hp} / ${maxHp()}` + (h.tempHp?`  (+${h.tempHp} shield)`:'')],
+    ['Magic',         `${h.mp} / ${maxMp()}`],
+    ['Damage a hit',  `${p.basic+p.extra}` + (p.hits>1?`  x${p.hits} hits`:'')],
+    ['Damage ignored',`${BASE.def+m.def}` + (arm?`  +${arm}% of what lands`:'')],
+    ['Reach',         `${BASE.range+m.range} tile${BASE.range+m.range===1?'':'s'}`],
+    ['Move',          `${BASE.move+m.move} tile${BASE.move+m.move===1?'':'s'} a turn`],
+    ['Credits',       `${S.credits||0}`],
+  ];
+}
 function renderStatusCards(){
   const cards=document.getElementById('statusCards'); cards.innerHTML='';
+  const stats=document.createElement('div'); stats.className='statSheet';
+  stats.innerHTML=statLines()
+    .map(([k,v])=>`<div class="statRow"><span>${k}</span><b>${v}</b></div>`).join('');
+  cards.appendChild(stats);
   const passiveCounts={};
   for(const id of S.hero.skills){
     if(SKILLS[id].kind==='passive') passiveCounts[id]=(passiveCounts[id]||0)+1;
@@ -1193,6 +1254,7 @@ function renderStatusCards(){
   const passiveIds=Object.keys(passiveCounts);
   if(!S.hero.equip.length && !passiveIds.length){
     const empty=document.createElement('div'); empty.className='draftOwned';
+    // (the stat sheet above stays — this only speaks to the gear list)
     empty.textContent='Nothing carried yet.';
     cards.appendChild(empty);
     return;
@@ -1296,8 +1358,8 @@ const KINDS={
   // The boss closes 2 tiles a turn and hurls its blade when you keep away, so
   // a long-range build can no longer walk backwards and win untouched. Faced
   // early (right after Level 5), so its HP is tuned lower than a late boss.
-  warden:{name:'Warden',hp:10,bd:6, def:4, range:1, move:2, dtype:'physical',
-          ai:'chase', boss:true, hurl:3},
+  warden:{name:'Warden',hp:14,bd:7, def:5, range:1, move:2, dtype:'physical',
+          ai:'chase', boss:true, hurl:4},
   /* Agent 180: a sniper that doesn't hold still. It strafes away from you
      every round, and every other round it may also close up to 2 tiles
      instead — so simply backing away doesn't keep the distance open the way
@@ -1496,13 +1558,23 @@ function applyBoardSize(i){
    next than one below or above it — rubble reads as a row of debris, not
    a column of it. */
 const WALL_HORIZ_BONUS=7, WALL_VERT_PENALTY=0.65;
-function pickWallCells(cells,wallCount){
+/* `spread` inverts the usual instinct to grow walls into horizontal runs:
+   on a sniper floor the cover wants to be scattered singles, so there are
+   lanes to be shot down and corners to break them with, rather than a few
+   long banks that either hide you completely or not at all. */
+function pickWallCells(cells,wallCount,spread){
   const chosen=new Set(), out=[];
   let remaining=cells.slice();
   while(out.length<wallCount && remaining.length){
     const weights=remaining.map(([c,r])=>{
       const horiz=chosen.has(key(c-1,r))||chosen.has(key(c+1,r));
       const vert =chosen.has(key(c,r-1))||chosen.has(key(c,r+1));
+      if(spread){
+        let touching=0;
+        for(const [dc,dr] of [[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,-1],[-1,1],[1,1]])
+          if(chosen.has(key(c+dc,r+dr))) touching++;
+        return Math.max(0.05, 1 - touching*0.45);
+      }
       let w=1;
       if(horiz) w+=WALL_HORIZ_BONUS;
       if(vert)  w-=WALL_VERT_PENALTY;
@@ -1595,10 +1667,19 @@ function generateLayout(F,floorIndex){
   // the retry loop would quietly bias the odds toward whatever fits easiest
   const wantShrines=rollShrineCount(F);
   for(let attempt=0; attempt<80; attempt++){
-    // His room is bare — no obstacles at all — so he's the one exception
-    // to the floor's wall range.
-    const hasLance = F.enemies.some(s=>s.kind==='lance');
-    const wallCount = F.npcRoom ? 0 : hasLance ? randInt(8,10) : randInt(wallLo,wallHi);
+    /* Room shape by who is in it. The Lance's room is nearly bare. The
+       Warden's is cleared out too — he closes the distance on foot, and a
+       floor full of cover turned his fight into hide-and-seek. A sniper
+       floor keeps its cover but thins it, so the lanes they need to see
+       down actually exist. */
+    const hasLance  = F.enemies.some(s=>s.kind==='lance');
+    const hasWarden = F.enemies.some(s=>s.kind==='warden');
+    const hasSniper = F.enemies.some(s=>s.kind==='sniper');
+    const wallCount = F.npcRoom ? 0
+      : hasLance  ? randInt(8,10)
+      : hasWarden ? Math.max(2, Math.round(randInt(wallLo,wallHi)*0.45))
+      : hasSniper ? Math.max(2, Math.round(randInt(wallLo,wallHi)*0.7))
+      : randInt(wallLo,wallHi);
     const cells=[];
     for(let c=0;c<COLS;c++) for(let r=0;r<ROWS;r++)
       if(!(c===GEN_START_COL&&r===GEN_START_ROW)) cells.push([c,r]);
@@ -1614,9 +1695,17 @@ function generateLayout(F,floorIndex){
       // hazard here, not a maze of rubble to path around too.
       wallSet=new Set(pickIsolatedWalls(cells,wallCount).map(([c,r])=>key(c,r)));
     } else {
-      wallSet=new Set(pickWallCells(shuffled(cells),wallCount).map(([c,r])=>key(c,r)));
+      wallSet=new Set(pickWallCells(shuffled(cells),wallCount,hasSniper).map(([c,r])=>key(c,r)));
     }
 
+    // A start tile with one way off it makes the first move a formality and
+    // sometimes a dead end — insist on at least two.
+    {
+      let ways=0;
+      for(const [dc,dr] of N4)
+        if(genOpen(wallSet,GEN_START_COL+dc,GEN_START_ROW+dr)) ways++;
+      if(ways<2) continue;
+    }
     const reach=genReachable(wallSet,GEN_START_COL,GEN_START_ROW);
     const openReach=[...reach].map(k=>k.split(',').map(Number))
       .filter(([c,r])=>!(c===GEN_START_COL&&r===GEN_START_ROW));
@@ -1780,7 +1869,13 @@ function generateLayout(F,floorIndex){
       if(spec===lanceSpec) continue;
       const far=openReach.filter(([c,r])=>!taken.has(key(c,r)) &&
         Math.max(Math.abs(c-GEN_START_COL),Math.abs(r-GEN_START_ROW))>SAFE_RADIUS);
-      const cands = spec.kind==='sniper'? far.filter(([c,r])=>sniperSiteOK(wallSet,c,r)) : far;
+      let cands = spec.kind==='sniper'? far.filter(([c,r])=>sniperSiteOK(wallSet,c,r)) : far;
+      if(spec.kind==='sniper' && cands.length){
+        // they shoot from the back of the room — the top third if it will
+        // have them, so closing the gap is the fight rather than an accident
+        const back=cands.filter(([c,r])=>r<=Math.max(1,Math.floor(ROWS/3)));
+        if(back.length) cands=back;
+      }
       if(!cands.length){ ok=false; break; }
       const [c,r]=genPick(cands);
       taken.add(key(c,r));
@@ -1989,8 +2084,7 @@ function loadFloor(i){
   h.mp=maxMp(); h.hp=Math.min(h.hp,maxHp());
   h.dodge=false; h.barrier=false; h.returnFire=false; h.buffs={}; h.uses={};
   h.tempHp=0; h.tempHealDecay=false;             // shields don't cross a doorway
-  h.floorMp=0; h.mending=false;                  // the chip and the battery stop at the door
-  S.upgradeUsed=false;                           // the Mechanic will do one more
+  h.floorMp=0; h.mending=false; h.slipped=false; // the chip, the battery and the slip stop at the door
   h.extraTurn=has('quick_attack');
   effects=[];
   say(F.tutorial? 'you enter the district. the city hums, indifferent.'
@@ -2209,6 +2303,11 @@ function advance(){
   // Re-entering while a hand-over is already in flight orphans the timer chain
   // and strands the game in the enemy phase — which is how you ended up unable
   // to move after a kill. One hand-over at a time, with a watchdog to recover.
+  if(h.slipped){                            // Quick Move: they get nothing this round
+    h.slipped=false;
+    say('they cast about for you, and find nothing.');
+    endEnemyPhase(); return;
+  }
   if(S.resolving) return;
   S.resolving=true;
   S.phase='enemy'; S.enemyPhaseAt=performance.now(); updateHud();
@@ -2269,10 +2368,10 @@ function endEnemyPhase(){
   // Essence of Vitality: a slow, unreliable mending — one round in five
   if(has('vitality') && S.hero.hp<maxHp() && Math.random()<0.2)
     heal(1,'the essence');
-  // HP Battery: 1 a round, and it keeps at it until there is nothing left to mend
+  // HP Battery: 1 a round, and it keeps at it until there is nothing left to heal
   if(S.hero.mending){
     if(S.hero.hp<maxHp()) heal(1,'the battery');
-    else { S.hero.mending=false; say('the battery goes quiet — nothing left to mend.'); }
+    else { S.hero.mending=false; say('the battery goes quiet — nothing left to heal.'); }
   }
   releaseReturnFire();
   S.round++;
@@ -2402,6 +2501,16 @@ function hurtEnemy(e,n){
     // The Lance's first bar is a feint — emptying it starts the fight over
     if(e.kind==='lance' && !e.phase2){ lancePhaseTwo(e); return; }
     e.alive=false;
+    // The Lance never moves, so once its escort is gone the fight becomes a
+    // safe grind from outside its reach. Killing the last of them calls two
+    // more in beside it — once only, so it's a second wave, not a treadmill.
+    if(e.kind!=='lance' && !S.lanceWave){
+      const boss=S.enemies.find(x=>x.alive&&x.kind==='lance');
+      if(boss && !S.enemies.some(x=>x.alive&&x.kind!=='lance')){
+        S.lanceWave=true;
+        setTimeout(()=>{ if(!S.over && boss.alive) summonLanceGuard(boss); }, 700);
+      }
+    }
     // whatever was piloting the Agent is still in the room, and it would
     // rather hand you something than be shot at again
     if(e.kind==='agent180'){
@@ -2584,11 +2693,69 @@ function stepAwayFrom(e,h){
   if(best){ e.col=best[0]; e.row=best[1]; return true; }
   return false;
 }
+/* The Agent's telegraphed shot: it takes a clear row, lights it, and fires
+   down the whole thing the following round. In a dark room where you can
+   only see two tiles, this is the one attack you can see coming — and the
+   lit row is also the only time you're told where it is standing. */
+function agent180Line(e){
+  const h=S.hero;
+  // fire down its own row if that row is clear of walls; otherwise take one
+  const rowClear=r=>{ for(let c=0;c<COLS;c++) if(isWall(c,r)) return false; return true; };
+  let r = rowClear(e.row) ? e.row : null;
+  if(r===null){
+    const open=[]; for(let rr=0;rr<ROWS;rr++) if(rowClear(rr)) open.push(rr);
+    if(!open.length) return false;
+    r = open[Math.floor(Math.random()*open.length)];
+  }
+  // stand on the row it is about to rake, so the shot has a visible source
+  const spots=[];
+  for(let c=0;c<COLS;c++) if(!isWall(c,r)&&!occupied(c,r,e)) spots.push(c);
+  if(spots.length){
+    let best=spots[0], bd=-1;
+    for(const c of spots){ const d=Math.abs(c-h.col); if(d>bd){ bd=d; best=c; } }
+    agent180BlinkTo(e,best,r);
+  }
+  e.marks=[]; for(let c=0;c<COLS;c++) if(!isWall(c,r)) e.marks.push([c,r]);
+  e.lineRow=r; e.phase='fire';
+  say('agent 180 lights a lane. get off that row.');
+  return true;
+}
+function agent180BlinkTo(e,c,r){
+  addFx({type:'ring',col:e.col,row:e.row,col2:'rgba(63,224,122,.9)',dur:340});
+  e.col=c; e.row=r; e.vx=c; e.vy=r;            // a blink, not a glide
+  addFx({type:'ring',col:c,row:r,col2:'rgba(63,224,122,.9)',dur:340});
+}
 function agent180Act(e){
   const h=S.hero;
+  // the lane it lit last round goes off now, whatever is standing in it
+  if(e.phase==='fire'){
+    const hits=e.marks||[];
+    for(const [c,r] of hits)
+      addFx({type:'ring',col:c,row:r,col2:'rgba(63,224,122,.9)',dur:460});
+    e.anim={t:performance.now(),kind:'shoot',dir:h.col>=e.col?1:-1};
+    if(h.row===e.lineRow){
+      say('the lane goes off, and you are still in it.');
+      noteTrouble('sniped');
+      hurtHero(enemyHit(e),'shot','physical',e);
+    } else say('the lane burns empty air.');
+    e.marks=[]; e.phase=null; e.spent=true;    // and it needs the next round to reload
+    return;
+  }
   e.moveTick=(e.moveTick||0)+1;
+  // every third round it stops strafing and lines one up instead
+  if(e.moveTick%3===0 && agent180Line(e)) return;
   const steps = e.moveTick%2===0 ? 2 : 1;      // the "big move" round: two steps away
+  const from=[e.col,e.row];
   for(let i=0;i<steps;i++){ if(!stepAwayFrom(e,h)) break; }
+  // In a room you can only see two tiles across, a silent reposition reads as
+  // the thing teleporting at random. Ring the ground it left and the ground
+  // it took, so the move is legible even when the body isn't.
+  if(from[0]!==e.col||from[1]!==e.row){
+    addFx({type:'ring',col:from[0],row:from[1],col2:'rgba(63,224,122,.75)',dur:420});
+    addFx({type:'ring',col:e.col,   row:e.row,   col2:'rgba(63,224,122,.9)', dur:420});
+    e.vx=e.col; e.vy=e.row;                    // a blink, not a glide
+    e.blinkAt=performance.now();
+  }
   if(cheb(e,h)>1 && losClear(e,h)){
     if(e.spent){ e.spent=false; return; }       // reloading — your window to close
     if(S.hero.buffs.lightning){ say('lightning turns the shot aside.'); return; }
@@ -2660,6 +2827,33 @@ function lanceAct(e){
     say('the beams pass through empty ground.');
   }
   e.marks=[]; e.phase='mark';
+}
+/* Two more bodies, dropped on free ground next to the Lance. Kinds are rolled
+   so the second wave isn't the same pair every run. */
+function summonLanceGuard(boss){
+  const spots=[];
+  for(let dc=-2;dc<=3;dc++) for(let dr=-2;dr<=3;dr++){
+    const c=boss.col+dc, r=boss.row+dr;
+    if(!inB(c,r)||isWall(c,r)||occupied(c,r,null)) continue;
+    if(cheb({col:c,row:r},S.hero)<=2) continue;      // never on top of you
+    spots.push([c,r]);
+  }
+  const pool=['goon','sniper','mortar'];
+  let made=0;
+  for(let i=0;i<2 && spots.length;i++){
+    const [c,r]=spots.splice(Math.floor(Math.random()*spots.length),1)[0];
+    const kind=pool[Math.floor(Math.random()*pool.length)];
+    const K=KINDS[kind];
+    // same veteran scaling the floor's own spawns get
+    const bd=K.bd+VETERAN(S.floor), hp=K.hp+VETERAN(S.floor);
+    S.enemies.push({kind,name:K.name,col:c,row:r,vx:c,vy:r,size:K.size||1,
+      hp,maxHp:hp,bd,def:K.def,range:K.range,move:K.move,dtype:K.dtype,
+      ai:K.ai,boss:false,alive:true,
+      poison:0,burn:0,vuln:0,anim:null,flash:0,n:S.enemies.length});
+    addFx({type:'ring',col:c,row:r,col2:'rgba(255,70,90,.9)',dur:520});
+    made++;
+  }
+  if(made){ shake(4); say('the lance is not alone. two more step out of the dark.'); updateHud(); }
 }
 /* thrown clear of the burn, to the nearest square that is not on fire */
 function shoveHero(hitTiles){
@@ -2793,18 +2987,49 @@ function wreckObstacles(){
     }
   }
 }
+/* The mortar used to fire the instant you finished moving, at the tile you
+   had just left — accurate, unreadable, and impossible to plan around. It
+   now works the way the Lance does: paint a tile, then drop the shell on it
+   the following round. One tile rather than a field, so it stays a soldier
+   rather than a boss.
+   If the square you are standing on is already painted, it takes a free one
+   from the ring around you instead — otherwise two mortars stack their
+   warnings on one tile and the second shell is invisible. */
+function mortarMarkFor(e){
+  const h=S.hero;
+  const taken=new Set();
+  for(const o of S.enemies)
+    if(o!==e && o.alive && o.marks) for(const [c,r] of o.marks) taken.add(key(c,r));
+  if(!taken.has(key(h.col,h.row))) return [h.col,h.row];
+  const ring=[];
+  for(let dc=-1;dc<=1;dc++) for(let dr=-1;dr<=1;dr++){
+    const c=h.col+dc, r=h.row+dr;
+    if(!inB(c,r)||isWall(c,r)||taken.has(key(c,r))) continue;
+    ring.push([c,r]);
+  }
+  return ring.length ? ring[Math.floor(Math.random()*ring.length)] : [h.col,h.row];
+}
 function mortarAct(e){
-  const h=S.hero, tc=h.startCol, tr=h.startRow;
-  e.anim={t:performance.now(),kind:'cast',dir:h.col>=e.col?1:-1};
+  const h=S.hero;
+  e.phase = e.phase||'mark';
+  if(e.phase==='mark'){
+    e.marks=[mortarMarkFor(e)];
+    e.anim={t:performance.now(),kind:'cast',dir:h.col>=e.col?1:-1};
+    say('the mortar ranges in. move off the red.');
+    e.phase='fire'; return;
+  }
+  const [tc,tr]=(e.marks&&e.marks[0])||[h.col,h.row];
+  e.anim={t:performance.now(),kind:'cast',dir:tc>=e.col?1:-1};
   addFx({type:'sprshot',from:{c:e.col,r:e.row},to:{c:tc,r:tr},
          key:'mortar_shot',dur:460});
   addFx({type:'blast',col:tc,row:tr,delay:420});
   if(h.col===tc&&h.row===tr){
     const d=enemyHit(e,'magic');
-    say('the shell finds you where you stood — your guard barely matters.');
+    say('the shell lands on you — your guard barely matters.');
     noteTrouble('shelled');
     hurtHero(d,'shell','magic',e);
-  } else say('a shell craters the ground you just left.');
+  } else say('the shell craters the ground you left.');
+  e.marks=[]; e.phase='mark';
 }
 
 /* ============================ SHRINES / ITEMS ============================ */
@@ -3008,7 +3233,9 @@ function leaveLevel(){
   S.phase='clear';
   const F=FLOORS[S.floor];
   say('you step through.');
-  if(!F.pool){ setTimeout(()=>{ closeDraft(); },520); return; }
+  // Level 0 is the walking lesson; handing out a skill there gave the player
+  // a menu before they had used a single thing on it.
+  if(!F.pool || F.tutorial){ setTimeout(()=>{ closeDraft(); },520); return; }
   setTimeout(openDraft,420);
 }
 /* Offer only what this level's pool allows, and never something you already
@@ -3040,8 +3267,25 @@ function drawDraftStatus(){
     `<div class="grp">ACTIVE <span class="num">${activeCount()}/${MAX_ACTIVES}</span></div>`+
     `<div class="grp">PASSIVE <span class="num">${h.skills.length-activeCount()}</span></div>`;
 }
+/* A look at the next room, one item short of the whole truth. Names what is
+   already knowable — the NPC you'll meet, the boss waiting — and hides one
+   thing behind ??? so arriving still costs you something. */
+function nextFloorHint(){
+  const F=FLOORS[S.floor+1]; if(!F) return '';
+  const bits=[];
+  if(F.npcRoom) for(const k of (F.npcKinds||['shopkeep']))
+    bits.push(k==='shopkeep'?'Shopkeep':k==='mechanic'?'Mechanic':'Ramen');
+  const boss=(F.enemies||[]).find(e=>KINDS[e.kind]&&KINDS[e.kind].boss);
+  if(boss) bits.push(KINDS[boss.kind].name);
+  const foes=(F.enemies||[]).filter(e=>!(KINDS[e.kind]&&KINDS[e.kind].boss)).length;
+  if(!bits.length && foes) bits.push(foes+(foes===1?' foe':' foes'));
+  if(!bits.length) bits.push('open ground');
+  bits.push('???');                       // never the whole picture
+  return `Next: <b>${bits.join(' + ')}</b>`;
+}
 function openDraft(){
   const ids=pick3(), anyFull=ids.some(skillFull);
+  document.getElementById('nextHint').innerHTML=nextFloorHint();
   const box=document.getElementById('cards'); box.innerHTML='';
   document.getElementById('draftTitle').textContent =
     'LEVEL '+S.floor+' CLEARED — CHOOSE A SKILL';
@@ -3049,6 +3293,10 @@ function openDraft(){
     anyFull? 'Your active slots are full.' : `Pick one, or keep what you have.`;
   drawDraftStatus();
 
+  // "take nothing" reads as a forfeit; it only IS one when your actives are
+  // full and picking would cost you a skill you already carry
+  document.getElementById('btnSkip').textContent =
+    anyFull ? 'Keep what I have — take nothing' : 'Skip this reward';
   const warn=document.getElementById('draftWarn');
   warn.className = anyFull? 'draftWarn show' : 'draftWarn';
   if(anyFull) warn.innerHTML =
@@ -3073,7 +3321,7 @@ function openDraft(){
   owned.innerHTML = S.hero.skills.length
     ? 'You carry: '+S.hero.skills.map(i=>`<b>${SKILLS[i].name}</b>`).join(' · ')
     : '';
-  document.getElementById('btnSkip').textContent = 'Keep what I have — take nothing';
+  // (the label is set above, from whether skipping actually costs you anything)
   document.getElementById('draft').className='curtain show';
 }
 function skipDraft(){
@@ -3456,14 +3704,16 @@ function renderTownMechCards(){
   }, MECH_MAGIC_COST);
   mk('LEAVE','Walk away','Head back out.',()=>{ closeScene(); updateHud(); });
 }
-/* One upgrade per floor. Spent the moment you take one, and since the
-   Mechanic isn't seen again this build, that makes it one for the run —
-   the card greys out under your hand rather than at the next visit. */
+/* Each upgrade is a one-off for the SKILL it belongs to, not for the visit.
+   You may sharpen everything you carry if you can pay for it, but never the
+   same thing twice — so the choice is which of your skills is worth the
+   credits, rather than which single one you can afford before the shutter
+   comes down. Taken cards grey out under your hand. */
+const upgradeTaken=(id,stat)=>!!(S.hero.upgrades[id]&&S.hero.upgrades[id][stat]);
 function renderTownUpgradeCards(){
   document.getElementById('sceneWho').textContent='Mechanic';
   const cards=document.getElementById('sceneCards'); cards.innerHTML='';
-  const spent=!!S.upgradeUsed;
-  const afford=(S.credits||0)>=MECH_UPGRADE_COST && !spent;
+  const afford=(S.credits||0)>=MECH_UPGRADE_COST;
   const priceTag=`<span class="tag swap"><img class="coinIcon" src="${UI_ICONS.icon_coin}" alt="">${MECH_UPGRADE_COST} credits</span>`;
   // stacked passives (e.g. Sharpen drafted twice) repeat the same id in
   // S.hero.skills — dedupe so each upgradeable skill gets one button, not one per copy
@@ -3475,11 +3725,12 @@ function renderTownUpgradeCards(){
     if(canDmg){
       const b=document.createElement('button'); b.className='card';
       b.innerHTML=`<div class="cat">${k.cat}</div><div class="nm">${k.name} — Damage</div><div class="ds">+1 damage, permanently.</div>${priceTag}`;
-      if(!afford) b.classList.add('cant');
+      const done=upgradeTaken(id,'dmg');
+      if(done||!afford) b.classList.add('cant');
+      if(done) b.querySelector('.ds').textContent='Already done — he won\u2019t touch it twice.';
       b.onclick=()=>{
-        if(S.upgradeUsed){ showNpcPortrait('mech_idle'); typeLine('“One at a time. Come back when you\u2019ve used it.”'); return; }
+        if(done){ showNpcPortrait('mech_idle'); typeLine('“I already did that one. Pick another.”'); return; }
         if(!trySpend(MECH_UPGRADE_COST)){ showNpcPortrait('mech_idle'); typeLine(MECH_NOCASH_LINE); return; }
-        S.upgradeUsed=true;
         S.hero.upgrades[id]=S.hero.upgrades[id]||{};
         S.hero.upgrades[id].dmg=(S.hero.upgrades[id].dmg||0)+1;
         say(`${k.name.toLowerCase()} hits harder now.`);
@@ -3491,11 +3742,12 @@ function renderTownUpgradeCards(){
     if(canRange){
       const b=document.createElement('button'); b.className='card';
       b.innerHTML=`<div class="cat">${k.cat}</div><div class="nm">${k.name} — Range</div><div class="ds">+1 range, permanently.</div>${priceTag}`;
-      if(!afford) b.classList.add('cant');
+      const done=upgradeTaken(id,'range');
+      if(done||!afford) b.classList.add('cant');
+      if(done) b.querySelector('.ds').textContent='Already done — he won\u2019t touch it twice.';
       b.onclick=()=>{
-        if(S.upgradeUsed){ showNpcPortrait('mech_idle'); typeLine('“One at a time. Come back when you\u2019ve used it.”'); return; }
+        if(done){ showNpcPortrait('mech_idle'); typeLine('“I already did that one. Pick another.”'); return; }
         if(!trySpend(MECH_UPGRADE_COST)){ showNpcPortrait('mech_idle'); typeLine(MECH_NOCASH_LINE); return; }
-        S.upgradeUsed=true;
         S.hero.upgrades[id]=S.hero.upgrades[id]||{};
         S.hero.upgrades[id].range=(S.hero.upgrades[id].range||0)+1;
         say(`${k.name.toLowerCase()} reaches further now.`);
@@ -3858,6 +4110,31 @@ function win(){
    board turned portrait (it was 12x6 landscape before that); every build
    since is 2.x. Each entry is [number, date, [lines]] — add to the top. */
 const VERSIONS=[
+  ['2.7.0','13 Aug 2026',[
+    'Fireball no longer sails through walls',
+    'A SAFE / IN COMBAT badge, and no more "click a glowing tile" on empty floors',
+    'Active skills grey out when there is nothing in the room to use them on',
+    'The Loadout opens on your actual numbers — damage, what you shrug off, reach, move',
+    'The Mechanic will improve every skill you carry, but each one only once',
+    'Skipping a draft only warns you about losing something when it would',
+    'Agent 180 leaves a mark where it blinked from, and the dark thins around it every third round',
+    'Kill the Lance\u2019s escort and two more come out to meet you',
+    'Sell an item says what it does, and says how to back out',
+    'No skill draft on the road — it is a walking lesson',
+    'You always start with at least two ways off your tile',
+    'Bigger PASSIVE / ACTIVE tags on the draft cards, and "gear" now says equipment',
+  ]],
+  ['2.6.0','13 Aug 2026',[
+    'You can always skip a turn — standing still is a move, and the button says so',
+    'Quick Move is an active now: slip away and the enemies lose a whole round',
+    'The mortar paints a tile a round ahead instead of firing where you just stood',
+    'The Warden hits harder and takes more, in a room with far less to hide behind',
+    'Snipers set up at the back, and their cover is scattered rather than banked',
+    'Agent 180 lights a whole row, then rakes it the next round — visible through the dark',
+    'The skill draft tells you what the next floor holds',
+    'Descriptions say heal rather than mend, and the Bow admits its damage falloff',
+    'Bigger names on whoever is talking to you',
+  ]],
   ['2.5.2','13 Aug 2026',[
     'The credits and version history stay a portrait card, sized to fit whatever window they open in',
   ]],
@@ -3865,7 +4142,7 @@ const VERSIONS=[
     'The Lance takes up to a quarter of its health from one blow, up from a fifteenth',
   ]],
   ['2.5.0','13 Aug 2026',[
-    'HP Battery mends 1 a round until you are whole, with no burst up front',
+    'HP Battery heals 1 a round until you are back to full, with no burst up front',
     'Skill Enhancer gives +2 magic for the floor instead of cheaper skills',
     'Modified Parts permanently improves a piece of gear you carry',
     'Black Gold Card pays out somewhere between 10 and 20 credits',
@@ -4234,8 +4511,6 @@ function noteTrouble(kind){
      doing fine. Re-run the model after any balance change. */
   if(kind==='shelled' && t.shelled>=2)
     nudge('t_shell','The shell lands where you last stood.','Step every turn');
-  if(kind==='glance' && t.glance>=3)
-    nudge('t_armour','Armour turns a single blade.','Magic, or more strikes');
 }
 
 /* ============================ HUD ============================ */
@@ -4299,7 +4574,7 @@ function updateHud(){
   for(const k in h.buffs) b.push(k.toUpperCase()+(h.buffs[k]<90?'·'+h.buffs[k]:''));
   if(h.dodge) b.push('DODGE READY'); if(h.barrier) b.push('BARRIER');
   if(h.returnFire) b.push('RETURN FIRE READY');
-  if(h.mending) b.push('MENDING');
+  if(h.mending) b.push('HEALING');
   if(h.tempHp>0) b.push('SHIELD·'+h.tempHp);
   if(h.ramenBeef>0) b.push('DOUBLE DMG CHANCE·'+h.ramenBeef);
   document.getElementById('hBuff').textContent=b.join('  ');
@@ -4308,9 +4583,14 @@ function updateHud(){
   // pulsing Strike button as the only move left.
   const hint=document.getElementById('hMath');
   const offering = !S.over && S.phase==='player' && S.attackable.size>0;
+  // With nothing alive there are no glowing tiles to click, so pointing at
+  // them read as a bug. A quiet floor is walked, not stepped through.
+  const fighting = S.enemies.some(e=>e.alive);
   hint.innerHTML = (S.over||S.phase==='enemy')? ''
     : `<img class="hintIcon" src="${UI_ICONS.icon_move}" alt="">`+
-      (offering? 'Step to a glowing tile, or strike' : 'Click a glowing tile to step');
+      (offering  ? 'Step to a glowing tile, or strike'
+       : fighting ? 'Click a glowing tile to step'
+                  : 'Click anywhere to walk there');
   hint.className='math';
 
   const ph=document.getElementById('hPhase');
@@ -4318,6 +4598,13 @@ function updateHud(){
                  : S.phase==='enemy'? 'ENEMY TURN'
                  : S.phase==='intro'? '' : 'YOUR TURN';
   ph.className='phase'+(S.phase==='enemy'?' enemy':'');
+  // whether anything in the room wants to kill you — the single fact that
+  // decides how every other rule on screen behaves
+  const zone=document.getElementById('hZone');
+  if(zone){
+    zone.textContent = S.over? '' : (fighting? 'IN COMBAT' : 'SAFE');
+    zone.className='zone'+(fighting?' hot':'');
+  }
 
   const playing = S.phase==='player'&&!S.over;
   // An attack offer is the moment the game is waiting on you, so it gets a
@@ -4331,13 +4618,18 @@ function updateHud(){
     b.onclick=()=>playerStrike(e,'physical');
     row.appendChild(b);
   }
-  // Ending early only exists when it's an actual decision: a strike you may
-  // decline, or a move left over after you've already struck.
+  // Always available: standing still is a real move, and hiding this made
+  // the game look like it was demanding you walk somewhere every round.
   const btnEnd=document.getElementById('btnEnd');
-  const canHold = playing && (S.attackable.size>0 || (h.struck && !h.moved));
-  btnEnd.style.display = canHold? '' : 'none';
-  btnEnd.textContent = S.attackable.size>0? 'Hold — don’t strike ␣' : 'End turn — don’t move ␣';
-  btnEnd.disabled = !canHold;
+  btnEnd.style.display = playing? '' : 'none';
+  // short enough to sit on one line in the button grid; the detail moves to
+  // the tooltip rather than wrapping and throwing the row heights out
+  const hold=S.attackable.size>0;
+  btnEnd.textContent = hold ? 'Hold ␣' : (h.moved||h.struck) ? 'End Turn ␣' : 'Skip Turn ␣';
+  btnEnd.title = hold ? 'End your turn without striking'
+               : (h.moved||h.struck) ? 'End your turn'
+                                     : 'Stay where you are and end your turn';
+  btnEnd.disabled = !playing;
   renderSlotBar();
 }
 /* Offensive actives aim first: the board lights up with legal targets and the
@@ -4382,6 +4674,9 @@ function aimTiles(id){
   for(let c=0;c<COLS;c++) for(let r=0;r<ROWS;r++){
     if(Math.max(Math.abs(c-h.col),Math.abs(r-h.row))>rng) continue;
     if(isWall(c,r)) continue;
+    // a spell needs to see where it is going — fireball used to sail
+    // straight through cover the bow was blocked by
+    if(!losClear(h,{col:c,row:r})) continue;
     if(k.shape==='single'){ if(enemyAt(c,r)) out.push([c,r]); }
     else out.push([c,r]);                    // an area may be centred anywhere
   }
@@ -4457,6 +4752,9 @@ function useActive(id){
   spendUse(id);
   if(id==='dodge'){ h.dodge=true; say('you set your feet — the next blow will miss.'); }
   if(id==='magic_barrier'){ h.barrier=true; say('a barrier hums into place.'); }
+  if(id==='quick_move'){ h.slipped=true;
+    addFx({type:'ring',col:h.col,row:h.row,col2:'#54dbd6'});
+    say('you slip out of reach — they lose the next round looking for you.'); }
   if(id==='return_fire'){ h.returnFire=true; h.reflectPool=0;
     say('you brace. everything they land this round comes back doubled.'); }
   updateHud();
@@ -4495,7 +4793,11 @@ function renderSlotBar(){
       b.title=`${k.name} — ${k.ds}`+(k.perRound?` (${left}/${k.perRound} left this round)`:'')+
         (cost?` · ${cost} MP`:'');
       if(S.aiming===id) b.classList.add('strike');
+      // On a floor with nobody in it, every one of these is a wasted click —
+      // grey them out rather than let players burn MP on an empty room.
+      const peaceful = !S.enemies.some(e=>e.alive);
       b.disabled = !playing || left<=0 || (k.mp&&h.mp<cost) ||
+        (peaceful && id!=='teleport') ||
         (k.atk&&h.struck) || (id==='dodge'&&h.dodge) || (id==='magic_barrier'&&h.barrier) ||
         (id==='return_fire'&&h.returnFire) || (id==='teleport'&&h.moved);
       b.onclick=()=>startActive(id);
@@ -4543,7 +4845,14 @@ function renderSlotBar(){
     el.appendChild(b);
   }
   const salvageBtn=document.getElementById('btnSalvage');
-  if(salvageBtn){ salvageBtn.classList.toggle('armed',salvageMode); salvageBtn.disabled=!playing; }
+  if(salvageBtn){
+    salvageBtn.classList.toggle('armed',salvageMode);
+    salvageBtn.textContent = salvageMode? 'Cancel — pick an item' : 'Sell an item';
+    salvageBtn.disabled = !playing || !h.consumables.length;
+    salvageBtn.title = h.consumables.length
+      ? `Trade one carried item for ${SALVAGE_RATE} credits`
+      : 'Nothing to sell';
+  }
 }
 
 /* ============================ RENDER ============================ */
@@ -4700,9 +5009,9 @@ function drawBoard(now){
       ctx.strokeRect(tileX(gc)+2.5,tileY(gr)+2.5,TILE-5,TILE-5);
     }
   }
-  // the lance's warnings, and the ground it has already burned
+  // painted ground: the lance's field and the mortar's single shell alike
   for(const e of S.enemies){
-    if(!e.alive||e.ai!=='lance'||!e.marks) continue;
+    if(!e.alive||!e.marks||!e.marks.length) continue;
     const charging = e.phase==='fire';               // about to go off
     const b = charging ? (.45+.45*Math.sin(now/90)) : (.22+.18*Math.sin(now/260));
     for(const [c,r] of e.marks){
@@ -5307,6 +5616,42 @@ function drawFog(now){
     ctx.fillRect(tileX(c),tileY(r),TILE,TILE);
   }
 }
+/* The Agent's lane is the one thing the dark does not swallow — it is drawn
+   after the fog on purpose. Without it the warning would be invisible, and
+   the shot would land out of nowhere in a room you cannot see across. It is
+   also the only time the Agent's own position is given away. */
+function drawAgentLane(now){
+  // Every third round the dark gives it away: a soft pool of light around the
+  // Agent with its shape in the middle of it. Enough to plan a move toward,
+  // not enough to fight by.
+  for(const e of S.enemies){
+    if(!e.alive||e.ai!=='agent180') continue;
+    if(((e.moveTick||0)%3)!==0) continue;
+    const pulse=.35+.25*Math.sin(now/420);
+    const x=cx(e.col), y=cyr(e.row), rad=TILE*2.1;
+    const g2=ctx.createRadialGradient(x,y,TILE*0.2,x,y,rad);
+    g2.addColorStop(0,`rgba(63,224,122,${(pulse*0.5).toFixed(3)})`);
+    g2.addColorStop(1,'rgba(63,224,122,0)');
+    ctx.fillStyle=g2;
+    ctx.beginPath(); ctx.arc(x,y,rad,0,7); ctx.fill();
+    ctx.save(); ctx.globalAlpha=Math.min(1,pulse*1.5);
+    drawSprite('sniper_idle0',x,pyOf(e.row)+TILE-3,S.hero.col<e.col,SPR_SCALE,SPR_SCALE,true);
+    ctx.restore();
+  }
+  for(const e of S.enemies){
+    if(!e.alive||e.ai!=='agent180'||e.phase!=='fire'||!e.marks) continue;
+    const b=.45+.4*Math.sin(now/90);
+    for(const [c,r] of e.marks){
+      ctx.fillStyle=`rgba(63,224,122,${(b*0.28).toFixed(2)})`;
+      ctx.fillRect(tileX(c)+1,tileY(r)+1,TILE-2,TILE-2);
+      ctx.strokeStyle=`rgba(63,224,122,${b.toFixed(2)})`; ctx.lineWidth=1;
+      ctx.strokeRect(tileX(c)+1.5,tileY(r)+1.5,TILE-3,TILE-3);
+    }
+    // the muzzle it will come from, so the lane has a source you can read
+    ctx.fillStyle=`rgba(180,255,210,${(0.5+0.4*Math.sin(now/70)).toFixed(2)})`;
+    ctx.beginPath(); ctx.arc(cx(e.col),cyr(e.row),TILE*0.22,0,7); ctx.fill();
+  }
+}
 /* The soft pulsing ring alone — no dimming. Shared by the darkened case
    below and by the noDim beats, which want the ring without the dark. */
 function drawTutorialRing(now){
@@ -5366,6 +5711,7 @@ function frame(now){
       const fade=S.darkFade===undefined?1:S.darkFade;
       if(!S.over && FLOORS[S.floor] && FLOORS[S.floor].dark && fade>0 && roomIsDark()){
         ctx.save(); ctx.globalAlpha=fade; drawFog(now); ctx.restore();
+        drawAgentLane(now);      // the lit lane burns through the dark
       }
       if(bubbleBlocking && !tutNoDim) drawTutorialDim(now);
     }
@@ -5439,7 +5785,8 @@ document.getElementById('btnStatus').onclick=openStatusPanel;
 document.getElementById('btnSalvage').onclick=toggleSalvage;
 document.getElementById('btnRestart').onclick=restart;
 document.getElementById('btnRestart').innerHTML=
-  `<img class="btnIcon" src="${UI_ICONS.icon_restart}" alt="">Restart Run`;
+  `<img class="btnIcon" src="${UI_ICONS.icon_restart}" alt="">Restart`;
+document.getElementById('btnRestart').title='Start the run again from the road';
 document.getElementById('btnSkip').onclick=skipDraft;
 window.addEventListener('keydown',ev=>{
   const k=ev.key.toLowerCase();
