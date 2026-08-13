@@ -67,6 +67,9 @@
   .bars{display:flex;gap:4px;justify-content:flex-end;margin-top:7px;align-items:center}
   .pip{width:18px;height:12px;background:var(--cyan);box-shadow:0 0 7px var(--cyan)}
   .pip.mp{background:var(--purple);box-shadow:0 0 6px var(--purple)}
+  /* shield pips sit on the end of the health row — same shape, yellow, so
+     it reads as extra health that isn't really yours */
+  .pip.shield{background:var(--gold);box-shadow:0 0 7px var(--gold)}
   /* must come after .pip.mp — same specificity, and a spent MP pip needs the
      dim "off" look to win the cascade, not the purple "lit" look */
   .pip.off{background:rgba(203,185,220,.15);box-shadow:none}
@@ -146,6 +149,23 @@
   @keyframes bobTri{0%,100%{transform:translateY(0)}50%{transform:translateY(3px)}}
   @media(prefers-reduced-motion:reduce){.bubble{animation:none}
     .bubble .dismissTri{animation:none}}
+
+  /* A bubble that points at chrome below the board (the item slots) rather
+     than a board tile — the stage clips at its own edge, so this one lives
+     outside it, docked to the slot bar's own box instead of a tile's %. */
+  .slotBarWrap{position:relative}
+  .bubble.dock{position:absolute;left:50%;bottom:100%;top:auto;
+    transform:translateX(-50%);margin-bottom:9px;animation:popDock .18s ease-out}
+  @keyframes popDock{from{transform:translateX(-50%) scale(.9);opacity:0}}
+  /* hover-to-inspect tooltip for a carried item — plain-language name +
+     description, not the slow/ugly native title tooltip */
+  .slotTip{position:absolute;bottom:100%;margin-bottom:9px;
+    transform:translateX(-50%);background:#f4eefb;color:#1b1430;
+    border:2px solid #1b1430;padding:5px 8px;font-size:11px;line-height:1.35;
+    max-width:150px;text-transform:none;font-weight:600;letter-spacing:.02em;
+    pointer-events:none;z-index:6;white-space:normal}
+  .slotTip b{display:block;text-transform:uppercase;letter-spacing:.06em;
+    color:#7a3f9e;font-size:10px;margin-bottom:2px}
 
   /* the opening scene: a lone ramen stall (drawn on the canvas, not typed) */
   .scene .sceneStage{font-size:24px;letter-spacing:.3em;margin-bottom:14px}
@@ -233,6 +253,77 @@
     pointer-events:none;transition:opacity .7s ease}
   .fader.on{opacity:1;pointer-events:auto}
 
+  /* Boss announcement: a band that sweeps in from the right, holds, then
+     carries on out to the left. Sits under the curtains so a draft or a
+     cutscene still covers it, but over the board it is announcing. */
+  /* Overhung well past both edges: tilted, a band only as wide as the stage
+     would leave bare triangles in the corners. */
+  .bossTitle{position:absolute;left:-50%;right:-50%;top:36%;height:96px;z-index:9;
+    display:flex;align-items:center;justify-content:center;
+    /* lighter toward both ends, so the bar lifts as it dissolves instead of
+       staying flat right up to where the dither eats it */
+    background:linear-gradient(90deg,
+      var(--bt-tip), var(--bt-bg) 30%, var(--bt-bg) 70%, var(--bt-tip));
+    color:var(--bt-fg);
+    /* The ends dissolve in dithered blocks rather than stopping at a clean
+       edge, so the band reads as painted-on rather than as a UI panel. The
+       mask is a Bayer-thresholded alpha ramp — every cell is fully on or
+       fully off, which a plain gradient could not give. */
+    -webkit-mask-image:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAABACAYAAAD1Xam+AAABGUlEQVR42u3cwarEIAwF0Nj//+d0XYV2IbUNnrN7DLN6zMUbJS0zM65a93e1z+HPVv8+bh3+H7AvAQACANiyj4wjgGlmBujsH3V6JwBAAAACAJicAejsUPSe/+n7TgCgAgACADADeJl3ArjnX3TP7wQACABAAADdDMA+ALAPAFABAAEAeAcQ7vnR2e0DAFQAQAAA9gHo7GAfAKACAAIAsA/AOwF0dvsAABUAEACAfQA6O2YO9gEAKgAgAAD7AMwM8E7APgBABQAEAGAfAJgZ2AcAqACAAADsAwgzB9zzOwEAAgAQAIB9AOCdgBMAIAAAAQDYBwD2AQAqACAAADMAnR3sAwBUAEAAAN4BhHcC6Oz2AQAqACAAgFJOeaTMQaZ3P10AAAAASUVORK5CYII=);
+            mask-image:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAABACAYAAAD1Xam+AAABGUlEQVR42u3cwarEIAwF0Nj//+d0XYV2IbUNnrN7DLN6zMUbJS0zM65a93e1z+HPVv8+bh3+H7AvAQACANiyj4wjgGlmBujsH3V6JwBAAAACAJicAejsUPSe/+n7TgCgAgACADADeJl3ArjnX3TP7wQACABAAADdDMA+ALAPAFABAAEAeAcQ7vnR2e0DAFQAQAAA9gHo7GAfAKACAAIAsA/AOwF0dvsAABUAEACAfQA6O2YO9gEAKgAgAAD7AMwM8E7APgBABQAEAGAfAJgZ2AcAqACAAADsAwgzB9zzOwEAAgAQAIB9AOCdgBMAIAAAAQDYBwD2AQAqACAAADMAnR3sAwBUAEAAAN4BhHcC6Oz2AQAqACAAgFJOeaTMQaZ3P10AAAAASUVORK5CYII=);
+    -webkit-mask-size:100% 100%;         mask-size:100% 100%;
+    -webkit-mask-repeat:no-repeat;        mask-repeat:no-repeat;
+    image-rendering:pixelated;
+    pointer-events:none;opacity:0}
+  /* The grain that lightens the ends. It lives on its own layer so it can be
+     tinted with the boss's own accent — as a plain white overlay it read as
+     snow on the darker bands. Clipped by the parent's dissolve mask. */
+  .bossTitle:before{content:"";position:absolute;inset:0;
+    background:var(--bt-tip);
+    -webkit-mask-image:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAABACAYAAAD1Xam+AAAB0ElEQVR42u3dQW7EIAwF0E/V+1+Z7irNZtI0BpLhvXU6kdLEwmBM673npKM/aAfXt8DnOPt+r/4eXu7/5f8H+xIAQAAAdvT9h5w+xTn/03Im5Pjv3r82+PrqOTojAEAAAAHAI4B9tX5cCNCK6wJgp3X/oTm8EQAgAAACAJBzdQCfVsuvboCRRte9XP19IwBAAAAEAODMHEAu5hyteF2zDb4eZs4ZZPKcxNvrjQBACgAIAMB2cwBX9zNn8RwB5ME9AJd+b0YAIAUABABAT8Dce91erT/ZaO9AdV2BOgBAAAABwCMAewGe1A9Azs+T3792pzoZIwCQAgACAKAfwOB+AHJ4slFPyV5cJ9Mr62iMAEAKAAgAwPb9AJK566LmCMiD1vmrzwE4O6dWei6BEQBIAQABANi+H0D12WVyeqKuoOz7uPq9GgEAAgAIAB4B2Aswc13euj/R4+/f30sq728EAFIAQAAAnA04OOePOQSin8Cq++sHAAgAIAB4BGAvwMyzytrI2mbk4Iv7VVT30Lx6vX4AgBQAEACA33yg956bnV8+ugcb5MZzFFN7DhoBgBQAEACAqAOYeD551p/XDpV7W65+P23m3hsjAJACAAIAsJUfuZdkoUwp0OAAAAAASUVORK5CYII=);
+            mask-image:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAABACAYAAAD1Xam+AAAB0ElEQVR42u3dQW7EIAwF0E/V+1+Z7irNZtI0BpLhvXU6kdLEwmBM673npKM/aAfXt8DnOPt+r/4eXu7/5f8H+xIAQAAAdvT9h5w+xTn/03Im5Pjv3r82+PrqOTojAEAAAAHAI4B9tX5cCNCK6wJgp3X/oTm8EQAgAAACAJBzdQCfVsuvboCRRte9XP19IwBAAAAEAODMHEAu5hyteF2zDb4eZs4ZZPKcxNvrjQBACgAIAMB2cwBX9zNn8RwB5ME9AJd+b0YAIAUABABAT8Dce91erT/ZaO9AdV2BOgBAAAABwCMAewGe1A9Azs+T3792pzoZIwCQAgACAKAfwOB+AHJ4slFPyV5cJ9Mr62iMAEAKAAgAwPb9AJK566LmCMiD1vmrzwE4O6dWei6BEQBIAQABANi+H0D12WVyeqKuoOz7uPq9GgEAAgAIAB4B2Aswc13euj/R4+/f30sq728EAFIAQAAAnA04OOePOQSin8Cq++sHAAgAIAB4BGAvwMyzytrI2mbk4Iv7VVT30Lx6vX4AgBQAEACA33yg956bnV8+ugcb5MZzFFN7DhoBgBQAEACAqAOYeD551p/XDpV7W65+P23m3hsjAJACAAIAsJUfuZdkoUwp0OAAAAAASUVORK5CYII=);
+    -webkit-mask-size:100% 100%;   mask-size:100% 100%;
+    -webkit-mask-repeat:no-repeat;  mask-repeat:no-repeat}
+  .bossTitle .bossName{position:relative;z-index:1}
+  .bossTitle.play{animation:bossSweep 3.1s forwards}
+  .bossTitle .bossName{white-space:pre;
+    font-family:var(--display);font-size:40px;
+    letter-spacing:.34em;text-transform:uppercase;
+    padding:0 18px;line-height:1.1;
+    /* the outline is drawn as a ring of shadows so it hugs the pixel font's
+       edges — -webkit-text-stroke thins out badly at this weight */
+    text-shadow:
+      -2px -2px 0 var(--bt-edge), 2px -2px 0 var(--bt-edge),
+      -2px  2px 0 var(--bt-edge), 2px  2px 0 var(--bt-edge),
+      -3px  0   0 var(--bt-edge), 3px  0   0 var(--bt-edge),
+       0   -3px 0 var(--bt-edge), 0    3px 0 var(--bt-edge)}
+  /* Each letter is turned back upright on its own. They still sit along the
+     band's slanted baseline, so the word climbs as a staircase of level
+     characters rather than reading as one tilted — or one flat — block. */
+  .bossTitle .bossName i{display:inline-block;font-style:normal;
+    transform:rotate(30deg)}
+  /* rotate() first, then translateX(), so the travel runs along the band's
+     own axis — it comes in from off the top-right and leaves past the
+     bottom-left, riding the slant instead of cutting flatly across it.
+     (The reverse order would translate along the screen's horizontal.)
+     It leaves at full opacity: fading it out on the way past just reads as
+     the card vanishing, and the slide never lands. Each leg carries its own
+     easing — it arrives decelerating, holds, then winds up and whips off. */
+  @keyframes bossSweep{
+    0%   {opacity:0; transform:rotate(-30deg) translateX(115%);
+          animation-timing-function:cubic-bezier(.16,.8,.3,1)}
+    16%  {opacity:1; transform:rotate(-30deg) translateX(0);
+          animation-timing-function:linear}
+    64%  {opacity:1; transform:rotate(-30deg) translateX(0);
+          animation-timing-function:cubic-bezier(.6,0,.85,0)}
+    100% {opacity:1; transform:rotate(-30deg) translateX(-115%)}
+  }
+  /* No reduced-motion variant here on purpose. The earlier one swapped in a
+     static hold, which meant anyone with "reduce motion" set never saw the
+     card travel at all — and because its @keyframes were declared inside the
+     media query, the card sat at opacity 0 and never appeared either. The
+     sweep IS the announcement, so it always plays. */
+
   /* The end of the run: the room whites out, a short narration reads over
      the white, then the credits climb through it. */
   .whiteout{position:absolute;inset:0;background:#fff;opacity:0;z-index:20;
@@ -301,6 +392,15 @@
   /* priced out of reach: the card says so before you click it */
   .card.cant{opacity:.42;filter:grayscale(.8)}
   .card.cant:hover{border-color:var(--edge);transform:none}
+  /* Giving something up, not buying it. Red so the two never get mixed up in
+     a row of otherwise identical cards. */
+  .card.putdown{border-color:rgba(255,92,106,.45);background:rgba(255,92,106,.13)}
+  .card.putdown:hover,.card.putdown:focus-visible{border-color:var(--danger);
+    background:rgba(255,92,106,.2)}
+  .card.putdown .nm{color:#ff8f98}
+  .card.putdown .tag.swap{color:#ff8f98;border-color:rgba(255,92,106,.5)}
+  /* an item the fence won't take */
+  .sqSlot.item.nosell{opacity:.45;filter:grayscale(.7)}
   .card .tag{display:inline-block;margin-top:6px;font-size:8px;letter-spacing:.14em;
     padding:2px 5px;border:1px solid var(--edge);color:var(--dim);text-transform:uppercase}
   .card .tag.act{color:var(--purple);border-color:rgba(168,110,222,.4)}
@@ -382,6 +482,12 @@
   .sqSlot .uses{font-size:8px;color:var(--gold)}
   .sqSlot.item{border:2px dashed var(--purple);background:rgba(168,110,222,.14);
     color:var(--dim)}
+  /* Salvage armed: every filled item slot re-reads as "trade this in" —
+     a danger-tinted border says so before the credits amount does. */
+  .sqSlot.item.salvage:not(.empty){border-style:solid;border-color:var(--danger);
+    background:rgba(255,92,106,.14)}
+  #btnSalvage.armed{border-color:var(--danger);color:#fff;
+    background:rgba(255,92,106,.18)}
 
   details{margin-top:12px;border:1px solid var(--edge);background:rgba(22,13,36,.4)}
   summary{cursor:pointer;font-size:10px;letter-spacing:.18em;text-transform:uppercase;
@@ -439,6 +545,7 @@
       <div class="phase" id="hPhase">YOUR TURN</div>
     </div>
     <div id="bubbles"></div>
+    <div class="bossTitle" id="bossTitle"><div class="bossName" id="bossTitleName"></div></div>
 
     <div class="curtain" id="draft">
       <div>
@@ -500,12 +607,17 @@
   </div>
   </div>
 
-  <div class="slotBar" id="slotBar"></div>
+  <div class="slotBarWrap" id="slotBarWrap">
+    <div class="slotBar" id="slotBar"></div>
+    <div class="bubble dock" id="itemBubble" style="display:none"></div>
+    <div class="slotTip" id="slotTip" style="display:none"></div>
+  </div>
 
   <div class="bar">
     <span id="strikeBtns" class="strikeRow"></span>
     <button id="btnEnd">End Turn ␣</button>
     <div class="spacer"></div>
+    <button id="btnSalvage" title="Trade a carried item for credits">Salvage</button>
     <button id="btnRestart">Restart Run</button>
   </div>
 
@@ -769,12 +881,10 @@ const SKILLS={
   magic_barrier:{cat:'DEFEND',name:'Magic Barrier',kind:'active',mp:1,
     ds:'Throw the next spell back at its caster.'},
 
-  second_wind:{cat:'HEALING',name:'Second Wind',kind:'active',mp:2,
-    ds:'Heal 2 HP a round, for five rounds.'},
-  healing:{cat:'HEALING',name:'Healing',kind:'active',mp:3,
-    ds:'Heal to full.'},
-  teleport:{cat:'ATTACK',name:'Teleport',kind:'active',mp:3,range:4,
-    ds:'Blink up to 4 tiles. Uses your move.'},
+  /* No active healing skills — healing is the consumables' job now, so the
+     only way to get health back mid-fight is something you chose to carry. */
+  teleport:{cat:'ATTACK',name:'Teleport',kind:'active',mp:3,range:Infinity,
+    ds:'Blink anywhere on the floor. Uses your move.'},
 
   /* --- offensive actives: the answer when basic skills stop being enough --- */
   fireball:{cat:'MAGIC',name:'Fireball',kind:'active',mp:1,atk:true,
@@ -802,17 +912,19 @@ const SKILLS={
   magic_heart:{cat:'GEAR',name:'Magic Heart',kind:'passive',
     ds:'+1 max MP.',mod:{mp:1}},
   vitality:{cat:'GEAR',name:'Essence of Vitality',kind:'passive',
-    ds:'+2 max HP. Heals 2 now.',mod:{hp:2}},
+    ds:'+1 max HP, and a 1-in-5 chance to mend 1 each round.',mod:{hp:1}},
 
   /* --- the Mechanic's favor: three skills found nowhere else --- */
-  return_fire:{cat:'DEFEND',name:'Return Fire',kind:'active',perRound:1,mp:2,
-    ds:'The next hit you take is thrown back at whatever dealt it.'},
-  mech_whirlwind:{cat:'ATTACK',name:'Whirlwind',kind:'active',perRound:1,mp:3,atk:true,
+  /* The Mechanic's three are per-FLOOR, not per-round — one shot each between
+     one room and the next, which is what makes them worth saving. */
+  return_fire:{cat:'DEFEND',name:'Return Fire',kind:'active',perFloor:1,mp:2,
+    ds:'Everything they land this round comes back doubled, split across every foe.'},
+  mech_whirlwind:{cat:'ATTACK',name:'Whirlwind',kind:'active',perFloor:1,mp:3,atk:true,
     range:1,bonus:2,shape:'around',
     ds:'Hit every foe around you. +2 damage, and half of them get shoved back a tile.'},
-  incendiary_shot:{cat:'ATTACK',name:'Incendiary Shot',kind:'active',perRound:1,mp:1,atk:true,
-    range:2,bonus:1,shape:'single',
-    ds:'Strike 2 tiles away. +1 damage, and a 1-in-5 chance to set the target burning — extra damage each round after.'},
+  incendiary_shot:{cat:'ATTACK',name:'Incendiary Shot',kind:'active',perFloor:1,mp:1,atk:true,
+    range:Infinity,bonus:-1,shape:'single',
+    ds:'Strike any foe on the floor. Less damage, but it always catches light.'},
 };
 
 /* which skills each level may offer — choices stay narrow early so the first
@@ -820,7 +932,7 @@ const SKILLS={
 const POOLS={
   basic:   ['dmg_up','def_up'],
   actives1:['fireball','whirlwind'],
-  actives2:['second_wind','firerain','slash'],
+  actives2:['firerain','slash'],
   passive: ['power_strike','quick_move','shield_block','dodge',
             'magic_barrier','bow','magic_staff','armor',
             'knight_armor','magic_heart','vitality'],
@@ -867,19 +979,50 @@ const CONSUMABLES={
   light_heal:{name:'Light Heal', icon:'icon_potion', price:4,
     ds:'Heal half what you\'ve lost.'},
   temp_heal:{name:'Temp Heal', icon:'icon_battery', price:4,
-    ds:'+50% HP for this floor, then it drains 1 a round.'},
+    ds:'Heal to full, plus a quarter-health shield. Drains 1 HP a round.'},
   crystal_ball:{name:'Crystal Ball', icon:'icon_crystalball', price:5,
     ds:'Refill your magic.'},
   ramen_beef:{name:'Beef Ramen', icon:'ramen_bowl1', price:5,
     ds:'Your next 5 hits each have a 1-in-5 chance to double.'},
   ramen_pork:{name:'Pork Ramen', icon:'ramen_bowl2', price:5,
-    ds:'+50% bonus health, for this floor.'},
+    ds:'A shield worth half your health, for this floor.'},
   ramen_seafood:{name:'Seafood Ramen', icon:'ramen_bowl3', price:5,
     ds:'Move anywhere on the floor, for 3 rounds.'},
+  skill_enhancer:{name:'Skill Enhancer', icon:'icon_skillchip', price:6,
+    ds:'Your skills cost 2 less magic, for 3 rounds.'},
+  attr_enhancer:{name:'Attribute Enhancer', icon:'icon_attrpad', price:7,
+    ds:'+1 damage, +1 defence, +1 move — for this floor.'},
+  super_enhancer:{name:'Super Enhancer', icon:'icon_supermedal', price:9,
+    ds:'+3 damage, for 3 rounds.'},
+  hp_battery:{name:'HP Battery', icon:'icon_hpbattery', price:6,
+    ds:'Heal 5 now, then 2 more each round for 5 rounds.'},
+  tech_parts:{name:'Modified Parts', icon:'icon_techparts', price:7,
+    ds:'+1 attack range, for this floor.'},
+  demon_book:{name:'Book of Demons', icon:'icon_demonbook', price:8,
+    ds:'Costs 70% of your health. Deals 15 to every foe on the floor.'},
+  black_card:{name:'Black Gold Card', icon:'icon_blackcard', price:3,
+    ds:'Cash it out for 20 credits.'},
 };
-const SHOP_CONSUMABLES=['light_heal','temp_heal','crystal_ball'];
+const SHOP_CONSUMABLES=['light_heal','temp_heal','crystal_ball',
+  'skill_enhancer','attr_enhancer','super_enhancer','hp_battery',
+  'tech_parts','demon_book','black_card'];
+/* What the merchant will actually stock. The Black Gold Card still turns up
+   at shrines — it just isn't something he'd ever hand over a counter, since
+   selling you money for money is no trade at all. */
+const NOT_SOLD=new Set(['black_card']);
+const MERCHANT_CONSUMABLES=SHOP_CONSUMABLES.filter(id=>!NOT_SOLD.has(id));
 const RAMEN_FLAVORS=['ramen_beef','ramen_pork','ramen_seafood'];
 const MAX_ITEMS=3;
+/* What Salvage pays out for a carried item — half its shop price, rounded
+   down, never less than 1. A blind Ramen flavor has no listed price of its
+   own, so it salvages at the shop's going rate instead of at zero. */
+/* Salvage pays a flat rate — what a thing sells for has nothing to do with
+   what the fence will give you for it. The Black Gold Card is the exception:
+   it IS money, so there is nothing to salvage it into. */
+const SALVAGE_RATE=3;
+const NO_SALVAGE=new Set(['black_card']);
+const canSalvage=id=>!NO_SALVAGE.has(id);
+const salvageValue=id=>SALVAGE_RATE;
 /* Consumable icons come from two different sheets: the shop's three are hand
    icons in UI_ICONS, the ramen bowls are sprite portraits in SPR — one
    lookup so callers don't need to know which. */
@@ -888,16 +1031,48 @@ function useConsumable(id){
   const h=S.hero;
   if(id==='light_heal') heal(Math.ceil((maxHp()-h.hp)/2),'the ramen’s warmth');
   else if(id==='temp_heal'){
-    const bonus=Math.round(maxHp()*0.5);
-    h.hp=Math.min(maxHp()+bonus,h.hp+bonus);
-    h.tempHealDecay=true;
-    say('the tonic swells your strength — it will not last the level.');
+    heal(maxHp()-h.hp,'the tonic');
+    h.tempHp=(h.tempHp||0)+Math.round(maxHp()*0.25);
+    h.tempHealDecay=true;                        // and it still charges you for it
+    say('the tonic closes every wound — but it will keep taking its price.');
   }
   else if(id==='crystal_ball'){ h.mp=maxMp(); say('the crystal ball refills your magic.'); }
   else if(id==='ramen_beef'){ h.ramenBeef=(h.ramenBeef||0)+5; say('beef ramen — your next blows land hard.'); }
-  else if(id==='ramen_pork'){ h.tempHp=(h.tempHp||0)+Math.round(maxHp()*0.5); say('pork ramen — a cushion of bonus health, for this floor.'); }
+  else if(id==='ramen_pork'){ h.tempHp=(h.tempHp||0)+Math.round(maxHp()*0.5); say('pork ramen — a shell of borrowed health, for this floor.'); }
   else if(id==='ramen_seafood'){ h.buffs.unlimited=3; say('seafood ramen — for a few rounds, the whole floor is in reach.'); }
+  /* The enhancer family rides the same per-round buff clock as everything
+     else in h.buffs — 999 is the codeword for "until the floor ends", since
+     the round tick only counts down values under 900. */
+  else if(id==='skill_enhancer'){ h.buffs.overclock=3; say('the chip bites in — your skills come cheaper now.'); }
+  else if(id==='attr_enhancer'){ h.buffs.attunement=999; say('every part of you tunes up a notch.'); }
+  else if(id==='super_enhancer'){ h.buffs.surge=3; say('the medallion burns hot — your blows land like hammers.'); }
+  else if(id==='hp_battery'){ h.regen=5; heal(5,'the battery'); }
+  else if(id==='tech_parts'){ h.buffs.scope=999; say('the parts click home — you can reach a tile further.'); }
+  else if(id==='demon_book'){
+    // it takes its price from you first, and never quite all of it — the
+    // book can gut you, but it can't be the thing that kills you
+    const toll=Math.min(h.hp-1, Math.round(h.hp*0.7));
+    if(toll>0){ h.hp-=toll; h.flash=performance.now(); shake(6);
+      addFx({type:'num',col:h.col,row:h.row,txt:'-'+toll,col2:'#ff5c6a'}); }
+    say('the book opens. it reads your blood, then everyone else’s.');
+    for(const e of S.enemies) if(e.alive) hurtEnemy(e,15);
+    if(!S.enemies.some(e=>e.alive) && !S.over){ updateHud(); renderSlotBar(); afterLastKill(); return; }
+  }
+  else if(id==='black_card'){ S.credits=(S.credits||0)+20; say('the card drains clean — 20 credits.'); }
   updateHud(); renderSlotBar();
+}
+
+/* Salvage: arm it, then the next item slot you click is traded for credits
+   instead of used. A one-shot toggle rather than a standing mode — spend a
+   thing and it turns itself back off, so it never lingers waiting to eat a
+   click you meant as a normal use. */
+let salvageMode=false;
+function toggleSalvage(){
+  if(salvageMode){ salvageMode=false; renderSlotBar(); return; }
+  if(!S.hero.consumables.length){ say('nothing carried to salvage.'); return; }
+  salvageMode=true;
+  say('choose an item to salvage for credits.');
+  renderSlotBar();
 }
 
 /* Icon glyphs for the ACTION slots — hand-drawn set, one per skill where
@@ -925,7 +1100,7 @@ vitality:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAK
 const SKILL_ICON={
   dmg_up:'dmg_up', def_up:'vitality', power_strike:'iron_sword', quick_move:'quick_move',
   shield_block:'shield_block', dodge:'dodge', magic_barrier:'magic_barrier',
-  second_wind:'second_wind', healing:'healing', fireball:'fireball', firerain:'firerain',
+  fireball:'fireball', firerain:'firerain',
   whirlwind:'whirlwind', slash:'slash', bow:'bow',
   magic_staff:'magic_staff', armor:'shield_block', knight_armor:'knight_armor',
   magic_heart:'magic_staff', vitality:'vitality', return_fire:'shield_block',
@@ -935,6 +1110,13 @@ const SKILL_ICON={
    replace icons, and the credits pill. Hand-drawn set, dropped in wherever
    a plain-text label used to stand alone. */
 const UI_ICONS={
+  icon_skillchip:"data:image/png;base64,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",
+  icon_attrpad:"data:image/png;base64,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",
+  icon_supermedal:"data:image/png;base64,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",
+  icon_hpbattery:"data:image/png;base64,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",
+  icon_techparts:"data:image/png;base64,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",
+  icon_demonbook:"data:image/png;base64,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",
+  icon_blackcard:"data:image/png;base64,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",
 icon_strike:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAM80lEQVR4nE1XaZBc1XU+d3uvt+menp5NmkU7lgZZG0iI1ewEB4idQFVwKsSJqbgwYApcpgIOkEqlKo7BKRKIbSoOwY4LCoRjhLAiUxJIkUdoR8tII2Zfema6Z6Z7en3bXU7qtYUrt96vd+97595zvvN93yUAAKichw4r8dhxD7ZHIxw8A4AAQAn8fiACIAUwCGDCeURoTFPSWB8EBoIgaLwPhyIABBA4AmhqQGgD5XOD5XRXN8sws3Tgvls37hsZqZDRmcLDxfaWZ8fy89lJ37zNjY7KaMJx6nVuRS3tLJailcV8khCCTZ2tVUO4dl0XpO8T5Tq2CQJbaobKoPY8DzzlA0EkTFiKcoY0CDixLSlkIOZPn9vfvWnrd6Kbt9/PFrPHvt2V+xIvxZu+dvDExY5Xvvs370317xkCAAYA4wAQBYAWALABIA8AVwJAGgAK4QEBwEB4SAB+OUkeADiX5/Dy9wIA6gAQBwALgDWtu2rnnmVfeaC07rbb7+sXGwjft1Bgw9np16b695zr6tn0oAqka7hIEfSG0W5eD8yyoZo/ATx1CwVFUblDYVxDMNwAEKASUDsGSVIRWCIgF4mhknFSIsi7EP1BY1gXEGjWGGSHT/UfveLmm05XFxfuPrgsDlRpyZetW1dhjC2EwaWW9cBxTH02tyLau/Xe1Markk5+4apEInmTCYJFJaWjpKyZQDkmUHXlB4gaWo2WVapUE1OkNRHBWVopf6R59a3mpvhZt1Y4HjjVQVCac87bSGZ5kwrBNAHAtTYELOForTEEGQYqluxdf2XnPV/rsa7YES/Wl3Z23l0pm+ksIDFBCEBKw5WNNBNCKBqDCpDEIhErOTc3uOudXxwoNHe0zRSr1QBEVHy4d99XX/yHZw83Z3ofUEo5WroR27IorATgVDAzfe7iKgA4g4RIAJJiPNFH29dGpM3RhkycNHWyXO5kP0XQlIK8XNtGDyAqV6Geitmx3vn5yXee/7t/3H7zH9x6T00BrQTaGhyeYprFwrUxSojFgDWjzeraaJyYmABOKdXl+dx2ADiAqDkVdrU0fuGT+eFLXa133btGudX87Aev/bytY03UKNMEgGGDNU4fApEQGm2Kx1bPZi++MTqaraNF/q0kYfX7Hx42LN5sqq6m67dd24ALpSzEDbWsuAJCcCWsBK6AgSI0RH6YT61MEHARK9hYO1O/cHwbTbetTbes6zZBMI0EfQDSQD0i1gCQ28Jms9mLu//yrx+7ctnqrgeVhNWFuidPDgyJ5SvXm45lXZCJinCzAQAJ4yAYo+OMEVE9TzkQjr404U+LaEydGkINyiVDeBN3nHqyo6mrmkhtdEtTF5iIdYJRVQi5BUTGsqg/lx/ZPT5V7JkqzL3oA3QuLJT1RycGxOqVGyCaSqnZXJYXMNBhYIMmAOAEqxW7JREl1eLlHqaUhQvqqDHQ2jCgcpGg8rXr9lSnRlH79REAUzNKO4jG0WicZCLSubS4cOTJp5/yKTev9m3uS382NiePHj8jJnI12Ll9B5YrhcjJgx8WpwfPRaPRlh6ttKfBD6yEjbFEwp45mW/i2mjQWoeoDnvAAwoxMKgwJBZVGyIOCsBaPyE0YCDnNaEkZtv23NzgjxYqXsAj/AdRwdLj+ZL6zW+PicmZAu7Ycb2ZzI6R6aELbw4c3PvmxGejmVSq+WYN/hQDO1ouV4vReKxl+46rr+NSSqK1DjPgABAd1okQ4xqjKlKDU5uf3+PryqV0qvduBO3Ytuicn589iohedrH0quHNd4xO5tTHh/t5rirxhpu+ZAr5eXbp5LH/+s+XnnnItlOrm5pb/kgaFNQw0AAmnYgDj0YgtiwDNOT4zxENgAyAhCQXEMKV55env/3UNy8MjuX7FFGz3GJFy6KH3n//3SUpzY+6W5vvmM3l5dt7DvBzo/Ow85obSLFQYFMXzh5866UffK+7u7uLx2gclfGJ1lXWgLqi7e0dwASHUuACRYtpLaUVcneoIWBkTTU2Q3Tglsev6Nv28GJhcV9HT/fiwsLU3upCdSqdWfYiCnrbRCWQ/3v4mBjN5vD6W28xxUKuPnH+1AevPP+tO1MdSVYouFcTKdZo7VeMCfKBDulPLyaTrVIQAS2JFHJUoXaEqYeaIqZstPYZYymtdZiVC5u2X3/o1KeDMyPnj59ExNUDQ6NvxVtatx0fnJP954fESInAtmuvM37gsvLs5M9e/dtHH+1e07d2cWauDYDZiISE/GoMhvoQ5kDqCA2VGirZeYtTxxOU0nAXZWpk2YD2UJk6FzxkO7brV/tntbFXvPKTn4Vk9WjP2jWrxvOe3PXebvHZdA6vvulGExcUPjt+eOwXP3zuuXi8vWMhl+8R3G7VWof/FWFwQowkpnFab/DI8TRp7Xb2v/76CJ0aGJyGIGhIKIKpGqOrCr2SIdoFAH/PL9/ed/HcsdgXNt3U/+xzL7+7/9DRE/2fnhFThSV52+13QHsiwS4eOdT/8xee2Gmn2tNay7WUsGZEIzRBF1FXtDa+1uhq3ZBwnV0qOa7nimQ608xtJK1RLkI+qAKwsiYmLIjnO14g4umN9cWxH57Kje3f98Wtr6/ZsPmd3e+++3HekW/dct+fPojS8ccGLu4av3Dm76NtK1i9XF5HhLCINp5BpgTqtAaZJcSyAHQoY2GpxXw2C+mOdvFn33w4w1PtGXsiN9NwV4iGE20cRD1PKc8QYH2VineqUpne+0n/gZLGuzpq5fjVI58e/vGVfRuOEBUce/mFJ75DIJ2Mx6EX0OKMGq6MLghhdKRj8/N+uXBIlS69KUUMBMVEGMfmxhAwEE0nJW3p7ZAr1qwKnU+PMSqmqXGMYRFDeRMn/HylMl2IiebN4+eP/kv/h3vPWDTScuONX37k7EdH9k5nf/t8a6ZnWTRJ1wWBYRK8OURTBA6kWi129d57f5+9butfOVKvF3FrllIeltVQK+ICavDdgNJ4JMKWdy8PrVRAwuRLJWlU+5lUqlCr5QYfuufprz54y3cPbmjb8UJ2+Nj3hi4d2T+fy7WsXr390Yi/5eSq9Vv+wq0UTtu2lWCGWiGpxWJtV1/zx488V4vFrbYbr02vvO6u+52FhbaAGR4XaT5y5GPXcxyP2zbjhCJJplOhxs8aJL2hIvoVKM5Whkf+5A8fec2GzEOFxXykWJr710TzFQcmRz8tKC1dAnivNsEyz6mFaTWGQgI41LQPFSWd3MzYxGLz+utodXh4tJKdztnxjoz2/SWRbFYwPZGzGJupOdUIR0Ckv2NDn1jGp75y3vvpq7Jjyx1PvPnG/9w1dW4ycnbiwJsTxbNPwNq1NhRnjhWLM19fKhUeY8RI7Zf2hGbVBLKuICQPowO3PpU985u3ouu33uZOjZ5amhr4IJrscNDTLqEN2udaygihIpThsDMaXt4wSu2a5zkfnx/ObLLXvzxbrsNA9tSeieLZx1MrVjTL2dmIslpaUHCWHTv5zyF5hc5ZiNgKrWWZgADGIEm4aI8mE+cWTx18HdzqJxCNntGek6BUeqxBL6GtaRwaOFUNh9fYhSZ8LiSKX//6Y/vgJ8PTzLabu9a2vTc6BsWg6F2jFS0jImVapng0s54xqPm+xzinNiJvmA1EyzbGSG4sszR85CUBgkcijCGhyhhhY8MTgGI29bWUlJqQfgBZ3wMPWAzRi0Qi6ZGR41VJZ7e0Rgsrl+bO/QoAUqDkDCHSZ8ytEOJNGCNLQRCElkypUOepX9dh/xtVQilnpHSl1dSqqR2rIyIH8JCQQHf2tNUo54ZR0JoB8EBLIyuBdXHXrmiipTdqjNCWJSLjZ8/WLrquAxBpsu2U0DqwkEciAgQVAkjAGAcpCXJGAZFxAKJsYkCBCWlNKdsQyjjhVCGPU5BIEQN66cSJJQBIeJUgJTpszVXgeyQejd7+9W/cduLD/WMCmxvSSG1YbieYVBoDC5Bo7Xnl8nxZQsMVh7el/3dzbDgr8/mNyfu9vDfA1bjAXL5xVb/14quPNm3acmt8ZU+HrNYUL05MuSvuvbPnqqee/P7+N/7jTgCYq/8uyOcffj5i0Lt25eqrttE7r7+5gSQelltrYnRoazkGEICsSzAsfKfJyNCEKhYK5PHHn/CPnjktdv3035fXl/V+5Qt3Xn9dfSYfyOnJMnl69+4rIdX5jZZNa58sT86M2yxqhCJkcmbKc10XW1vbWFMySZ1aLQO2nYkm4pBpaQFgoYMLnwaGQmcDSClogkAVAicUarVa48bc3t4OtXoNKuUymEQTtC1vg/xHh575py/f8v1GGgcGxjv/uzDzTBGJ6G7vPD09cGHVF2+44RLRQPKFeSSUorAjujWT8bQKoFqrhj6ykRapNdGcU0Gpnhkf2tG+qndDbmjyQN/GrVnDgRAGpFKq4uzQZ6vKiws39u3Y9svlsaYa5GcP/PnOnZX/Ax0+b34va6VwAAAAAElFTkSuQmCC",
 icon_move:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAALLklEQVR4nK1XeZAcVRn/3uvX5/TsTO8wm2uzCSQhmEMMRXFpQQlYJopHiSCFCsjlAYUVEQJaVLKWJUTlMJQpkwiGRIgQJSLBgITbSpQYQgQSyM3emdm5p6ePd1mvZzcsyp++qa6Z193znb/v930PAQBs3bb5lk9dfOavIumDpZsgZAyABAgAkMlHgJQACAFwCIDSCGJKQXABRCdgEAsMlAEJABhh0LEBGLDaAUq+RfJMySGAYahcfG9W55kfX7ECGFr50G0rFp419ybPmZzy3MxtnpeDqFVFWMfqPxBFtG2KAMAYS8ojEMAlpTRRYjkWsk0XEHOQel+9wwWAhpViDZTJbTmxhjEWcURPjmXt+06KDMZl83qSzbuX1sMqKQ6GN1+9+OaHAUAHAJYY/NFLSVXSydieJi62r8SGCe+2Hf+v9dM1N7+4+AsXbl3Qc7ZLiEMGKkWfffdzP3x44cI5p4zWIg+otBHCHGPMAehEAcrLQAnlnGcwxk2MsY5sVJKBdPR0usGaTVfX9TiKpC1llJKERFJKZCAUOI7GjtPq8d1vv7L3nAvOFq0pkSBSSsOydG35S8vJg5c+aMZx7HOOEUKIIYSElInScYcQY5wqgGiazjs6bIsQjHgUWbGPpkXloRHGZAMg1ADMQOqCSilVxABRzGzb5rVaGefdM11GYxyzGIhyjwkJvRf3smw2b0ipc4YEM/5HeXvpuq4LwVLEJnD8+OAeAIjHHh3MZvPzKQpsKSwTMdFElIaSEFc5AobUhBBKnoY0wU3TBIMYQEBKpGk4yZ+UMoGsDoClAv9HLCmFZrkWrhQLu/YP7bqu0Rq9aKh4iL659+Dgiu+sWmWlvW4OIlAKZWwAolLhqb1MqQyQ9agBnHPgjINKwUT54x7/l+fJH0F5Ytu2bpnau4/uePS8Ku27x86jTEqPoSdy4KqlX967Yd3255wUmcpqiEtdWOMgRAipchhTZqp9G7FyHLttvR/ajS/GeMyYCCzLMiZN6mT9/f2VWfMmnwfpambvod3h8dpIM90lwXThImg2i5ZmxQjF1AADdKlr6mo7hZQByHEystlqwlBpSPGCACGT3ADGTJUUVqhlmHFdEp0iTHUiypZleaXSyLul0khTWf/Apt7X7bxf0Dr8HCa2dfid0beJaT9peV5PHLIuTbOalNKAENIuyxgEmEkEtK7cDFJtleGtQ/8EgtDEsv1w3CliDDMtxLqdLZdL9Ud+//BFJEVJRCMydKzCypXijtPOzH2xNqI9tu3hf296Zduunel055yQ05rCkQEgI0QTDCBIiC1xNI4oZpwB5wCknYl2ahBSIZJSfSOKqcq5ZVmiViv0b33xzwuQU3pi1tw5Bo0ENM+pwmjLBBpKymRq8yvbdj1jWdb0VCo+7KK0jCKZ9/1KgKhhnFAcx8KbMsV67L41x5atvfVY1s05REoBGLVJjWLMEAq1WBKGURybpknMzpS/+sFfnMxThSeMSQ3j5T1bIe12CN1mgkKsIWLoZLLc8ssnlt2w/++jTz+06iEPoFkEgH7LyuYAhJBSkHb+FcZCGB6Glq7rDc6ZomcidV2x74kyVPZKqeuOruvZwtGjx2ef0fVbnC31DB+tD7728pvvHBk4QGPGicFdhIWEeliE6acZ67wZ1Xu37lynbdx234JHtz2wJAyrBeJoFkLKMRwjFHEUJdWQlDPGSGJAHEwzISt1V1GgQIjFRGimEOZsxfncLVHmhnBg/7E7G9tnnjt32sJ+SyeSikBwBlAdCodHKyVx6ic7v141D+5zZ9deLcf9P1a0bRggMaYBxnGEEKKEkAQTGuhCCIkISAZau/EltRrHiCnACBQFsW7uU1XYqvBSNQ5rwwOl1uhJ729osdwshxFRZzXQpCGrx+I7Rwf9b3XNMD7RMkq0PIrI4f3VY4lIimpBQMJxZBv5KCl1jA2hfiTJF6LdMjFjEULKGiSlYeh+s1kAALvv5eY12ZkW/O13u+N5X8rcX6KDyK+biCEqTMdGsV7J9b+qXdJ5fto8dfqi2DCmoqeev1fl1S2Xyy2AFAHwlT6Gifch5iNj6Ew2mqYxhAKFBRTVw1K7xTqZpUt7FYr5ZfMua005o8ELlSLogYOdlIkCFslsl33XrCWnbb7p2rtGASAPABWV0FQqZfu+HwD4CQUnlIoTMkqYEGtjvZu2S3W8HlUZilQqZViWlQFoRZlMJpgyxbM279sc57y0yGWzkjbxV47s8V8ImxTFdqmjlTvy6ron75npgVebfdZsBB0d4AuF/mS1h6sJC5+gYvnBTU3T1Ayg2jD3fT9EIRKdnZ3OtGnTWsPDlb7fbL39ecfTpkiuIacjMxANdV5XOOLvRIjiwCnM7Kdv/On6lZfNOvT6ofqpk1M4k05bE3n+o9gOq9tMsORhC2OhFLdaLZUT6ubdWrlcHnxn/jt842s/ebZpDF8csdg+/K+K/8yaPd7GtRsHi4flFc1Be3vMWUx0/rGw2ZimlB04MFyqFQpHOrq7ddd1VSQUzTOktVPAuUCCcyBCbRM8AiA/AUqy6enpyQohqivX/eBrP++66ury4OhnpSahclC+GBWMW/btOlyYe95cZ8787otDY3Bm1JBGfZC+qOPcTiXq9vu/vaxZa1y4esVjS8ZGPFXrjizKDAA0JGqnBLetkSdSMB6uvr6+cGBgIChXSnYQBUtCEUKzHz9u+TNu3PDA00dnzs/j93a814h544qu6d7ssGQ8h2Lv1vt6N8nOzmlTWSCP6MTYfvm1n99y5Q2XLFWOue5kK0zGvGTClgYxFEgkSDmmV9lWa89988894zO8Fesrb39k/S13X1GzOifN2bnljc2vv/bXoz09Ga86SOtKjoxS9zf7yAsDb7We3/LrR/Z2daW6CoXB1n0/Wvu4EnnN976qRzQYVkMAxi1u5vSwNZoYgHfv2H8+QZDURVIGnHLN8zxRqVS4ZRlzWgELPc/LrLrzD1vGIqN3d3fbfX0DFQDV8MC5d+mGbQCgLi2bndxTKIzUllx54bIg8Kt7Xz6waf3qP/4MAFIKA/V6naXsSbZKgTov8JjqxLL0eKS/PFm9ZMZmVKqUFAbc3S/9Y+3YBOxmZmSytm7r1YGqVS6Xx8dwA8BOZzJGlzPJafgjvjjpJHekWgWZzbqE0WhapVIxpk6d6pWDIBVWKgKgIxkBk9LnVM45/ZQdBGMzkFhOcWdAT+n90rv5PKSKRZDpdNqyLAsVi8W49n7NqEEtnDDnq/JCAEFYq6mrJgE6UL1+yFTCN63+y21jETOHhobImCMaQJ0SG4nly5djpGHkZvQQIyGRTVzpJm07la/HGcVktNFotIrFogaum06lJimFSpAygk4gLf7BVQ/HfotMT8bLZDLemKEK/foY4BGxCO/t7RUaMxmiRA0CUiAd+MhBxcdx4GCvy52b07yTvbjWV+PFfcWKD00Vcq37nG7SGm0pQXK8niWXSAqpjnJJS8XtzkbBBchNzqGxvTpHImISseiCRWxx76IFhi7ywBGgjS/cvQ13xov37R48VNwLi9c+uPbwRKaakTk9++krFuXXr1k/BAA+/B/W2mfv2JfNeh2tEfJNtHbzPfPdXOobzK7dEYZRnyHJEGWRLTShqc7Y8uNZjuM4tWq1mj0p3S94e7aHsUNLcm6Wsj3YqqMMVq1WnYGTeCBF9arMFdcQjeAg8mnG7TydBeb5Ny5Z9toJfl711K0PWFlz3siR8iJvkntYt4gvmECGaQYSIJacW4o7BNJAMJ7okkIAwjg5CWuaduJeQjTJ6bjNssqIKIqE49ro+PHRQyd3L3xWb+RfvXzx5eX/ACWK2MhELyxfAAAAAElFTkSuQmCC",
 badge_passive:"data:image/png;base64,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",
@@ -1027,6 +1209,7 @@ const FLOORS=[
     accumulated this early. No draft here — the reward is the Shop Level
     right after it. */
  {name:'LEVEL 6 — THE WARDEN', boss:true, pool:'all', intro:'warden',
+  bossTitle:'warden',
   enemies:[{kind:'warden'},{kind:'goon'},{kind:'goon'}], shrineCount:3},
 
  /* A Shop Level: the Shopkeep alone, selling equipment and consumables
@@ -1065,7 +1248,7 @@ const FLOORS=[
     the distance the way it does against a normal sniper. */
  {name:'LEVEL 12 — AGENT 180', boss:true, pool:'passive',
   intro:'agent180', dark:true, gridWalls:true, arenaSize:12,
-  introCut:'agent180',
+  introCut:'agent180', bossTitle:'agent180',
   enemies:[{kind:'agent180'}], shrineCount:0},
 
  {name:'SHOP LEVEL', pool:'all', npcRoom:true, intro:'shop', shop:'full',
@@ -1084,6 +1267,7 @@ const FLOORS=[
     Last floor in the array — hasExit is set false below, so winning here
     ends the run rather than opening a door. */
  {name:'THE LANCE', boss:true, pool:'all', intro:'lance',
+  bossTitle:'lance',
   enemies:[{kind:'lance'},{kind:'goon'},{kind:'goon'}], shrineCount:3},
 ];
 /* Every level but the last has a way out. On a level with foes it stays shut
@@ -1228,8 +1412,38 @@ function shuffled(arr){
   for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
   return a;
 }
+/* How many shrines a room gets. Each one is rolled off the back of the one
+   before it, so a second is uncommon and a third close to a curiosity. Boss
+   rooms open the chain wider at the front; the later rolls are conditional,
+   so they scale up with it on their own.
+   Two rooms opt out: one authored with no shrines (the shops, the Mechanic,
+   the Agent's dark arena) stays dry, and the road keeps its guaranteed one —
+   the movement tutorial teaches shrines there, and a dry road would silently
+   skip both the "free loot" and the "it's a consumable" beats. */
+const SHRINE_ODDS      = [0.30, 0.30];   // the first, then a second
+const SHRINE_ODDS_BOSS = [0.70, 0.30];
+const SHRINE_ODDS_TAIL = 0.10;           // the third, and every one after it
+/* The chain has no design cap — it just keeps paying 10%. This ceiling is
+   only so the loop is guaranteed to end and so a freak roll can't ask for
+   more shrines than the room has floor: reaching it means nine 10% coins in
+   a row, about one room in a hundred million. */
+const SHRINE_CEILING   = 8;
+function rollShrineCount(F){
+  if(!F.shrineCount) return 0;
+  if(F.tutorial)     return F.shrineCount;
+  const head = F.boss ? SHRINE_ODDS_BOSS : SHRINE_ODDS;
+  let n=0;
+  while(n<SHRINE_CEILING){
+    if(Math.random() >= (n<head.length ? head[n] : SHRINE_ODDS_TAIL)) break;
+    n++;
+  }
+  return n;
+}
 function generateLayout(F,floorIndex){
   const [wallLo,wallHi]=wallRangeForFloor(floorIndex||0);
+  // rolled once for the room, not once per layout attempt — re-rolling inside
+  // the retry loop would quietly bias the odds toward whatever fits easiest
+  const wantShrines=rollShrineCount(F);
   for(let attempt=0; attempt<80; attempt++){
     // His room is bare — no obstacles at all — so he's the one exception
     // to the floor's wall range.
@@ -1256,7 +1470,7 @@ function generateLayout(F,floorIndex){
     const reach=genReachable(wallSet,GEN_START_COL,GEN_START_ROW);
     const openReach=[...reach].map(k=>k.split(',').map(Number))
       .filter(([c,r])=>!(c===GEN_START_COL&&r===GEN_START_ROW));
-    if(openReach.length < F.enemies.length + F.shrineCount + (F.hasExit?1:0) +
+    if(openReach.length < F.enemies.length + wantShrines + (F.hasExit?1:0) +
       (F.npcRoom ? (F.npcKinds?F.npcKinds.length:1) : 0)) continue;
 
     const taken=new Set(); let ok=true;
@@ -1425,7 +1639,7 @@ function generateLayout(F,floorIndex){
     if(!ok) continue;
 
     const shrines=[];
-    for(let i=0;i<F.shrineCount;i++){
+    for(let i=0;i<wantShrines;i++){
       let options=openReach.filter(([c,r])=>!taken.has(key(c,r)));
       if(i===0){
         // the first shrine is never one step away — a small walk before
@@ -1456,7 +1670,7 @@ function generateLayout(F,floorIndex){
   const enemies=F.enemies.map((spec,i)=>({kind:spec.kind,
     col:1+(i%perRow), row:1+Math.floor(i/perRow), over:spec.over}));
   return {walls:[], exit:F.hasExit?[midCol,0]:null, enemies,
-          shrines:F.shrineCount>0?[[midCol,2]]:[], npcs:[], boxWalls:[], decor:[]};
+          shrines:wantShrines>0?[[midCol,2]]:[], npcs:[], boxWalls:[], decor:[]};
 }
 
 /* ============================ STATE ============================ */
@@ -1496,10 +1710,14 @@ function mods(){
     if(g.mod.def)  m.def  +=g.mod.def;
     if(g.mod.move) m.move +=g.mod.move;
   }
-  const b=S.hero.buffs||{};              // shrine rewards stack on top
+  const b=S.hero.buffs||{};              // consumable buffs stack on top
   if(b.fire)      m.extra+=2;
   if(b.whetstone){m.extra+=1; m.def+=1;}
   if(b.wind)      m.move +=1;
+  if(b.surge)     m.extra+=3;
+  if(b.attunement){m.extra+=1; m.def+=1; m.move+=1;}
+  if(b.scope)     m.range+=1;
+  if(b.overclock) m.mpCut+=2;
   return m;
 }
 function skillUpgrade(id,stat){ return (S.hero.upgrades[id]&&S.hero.upgrades[id][stat])||0; }
@@ -1614,7 +1832,8 @@ function loadFloor(i){
   h.moved=false; h.struck=false;
   h.mp=maxMp(); h.hp=Math.min(h.hp,maxHp());
   h.dodge=false; h.barrier=false; h.returnFire=false; h.regen=0; h.buffs={}; h.uses={};
-  h.tempHp=0; h.tempHealDecay=false;             // pork ramen / temp heal fade at floor's edge
+  h.tempHp=0; h.tempHealDecay=false;             // shields don't cross a doorway
+  S.upgradeUsed=false;                           // the Mechanic will do one more
   h.extraTurn=has('quick_attack');
   effects=[];
   say(F.tutorial? 'you enter the district. the city hums, indifferent.'
@@ -1624,7 +1843,38 @@ function loadFloor(i){
   tutShown=null;
   S.darkFade=1;                                  // dark floors start dark, unless a cutscene says otherwise
   renderSlotBar(); updateHud();
+  // Agent 180 holds its card back until the lamps are out — playAgentIntro
+  // fires it once the room has finished going dark, so the name lands on
+  // black rather than over a lit room it is about to replace.
+  if(F.bossTitle && F.introCut!=='agent180') playBossTitle(F.bossTitle);
   if(F.introCut==='agent180') playAgentIntro(); else beginPlayerTurn();
+}
+/* Each boss gets its own colours announcing it — the name, the outline that
+   carries it, and the band it rides in on. */
+/* tip is the lighter colour the band's ends lift toward. The Lance's band is
+   already white, so its ends tint toward its red instead of going brighter. */
+const BOSS_TITLES={
+  warden  :{name:'The Warden', fg:'#ffffff', edge:'#3fbf5a', bg:'#0b2a15', tip:'#2f8f4c'},
+  agent180:{name:'Agent 180',  fg:'#3fe07a', edge:'#0b3a1c', bg:'#000000', tip:'#12592c'},
+  lance   :{name:'The Lance',  fg:'#ffffff', edge:'#c81f2e', bg:'#ffffff', tip:'#f0aab0'},
+};
+function playBossTitle(which){
+  const t=BOSS_TITLES[which]; if(!t) return;
+  const el=document.getElementById('bossTitle');
+  // one element per character, so each can be stood back upright by itself
+  const nameEl=document.getElementById('bossTitleName');
+  nameEl.innerHTML='';
+  for(const ch of t.name){
+    const s=document.createElement('i');
+    s.textContent = ch===' ' ? ' ' : ch;
+    nameEl.appendChild(s);
+  }
+  el.style.setProperty('--bt-fg',t.fg);
+  el.style.setProperty('--bt-edge',t.edge);
+  el.style.setProperty('--bt-bg',t.bg);
+  el.style.setProperty('--bt-tip',t.tip);
+  el.classList.remove('play'); void el.offsetWidth;   // restart the sweep on a replay
+  el.classList.add('play');
 }
 /* The room the shot is fired into: a pillar far enough off to read as a
    demonstration rather than a stray round, falling back to open floor. */
@@ -1662,6 +1912,7 @@ function playAgentIntro(){
       if(S.gen!==gen) return;
       S.darkFade=Math.min(1,(performance.now()-t0)/dur);
       if(S.darkFade<1) requestAnimationFrame(roll);
+      else playBossTitle('agent180');        // fully dark — now name it
     })();
   },1500);
   setTimeout(()=>{
@@ -1764,8 +2015,10 @@ function beginPlayerTurn(){
   const h=S.hero;
   h.startCol=h.col; h.startRow=h.row;      // the mage shells this tile
   h.moved=false; h.struck=false;
-  h.uses={};                               // the Mechanic's tools come back each round
-  if(h.regen>0){ h.regen--; heal(2,'second wind'); }
+  // per-round uses come back; per-floor ones (the Mechanic's) carry their
+  // count across the whole room and only clear in loadFloor
+  for(const id in h.uses) if(!SKILLS[id]||!SKILLS[id].perFloor) delete h.uses[id];
+  if(h.regen>0){ h.regen--; heal(2,'a slow mending'); }
   computeReach(); computeAttackable();
   S.phase='player'; updateHud(); tutorialCheck();
   // Safety valve: if a turn opens with nothing you could possibly do — boxed in
@@ -1848,6 +2101,10 @@ function endEnemyPhase(){
   if(S.hero.tempHealDecay && S.enemies.some(e=>e.alive)){
     S.hero.hp=Math.max(1,S.hero.hp-1);
   }
+  // Essence of Vitality: a slow, unreliable mending — one round in five
+  if(has('vitality') && S.hero.hp<maxHp() && Math.random()<0.2)
+    heal(1,'the essence');
+  releaseReturnFire();
   S.round++;
   beginPlayerTurn();
 }
@@ -1926,12 +2183,13 @@ function handOffAfterStrike(){
 }
 /* Only the Mechanic's skills are counted. Everything else is capped by MP
    alone, so `Infinity` here means "the purple bar is the only limit". */
+const useCap = k => k ? (k.perRound || k.perFloor || 0) : 0;
 function useLeft(id){
-  const k=SKILLS[id]; if(!k||!k.perRound) return Infinity;
-  return k.perRound - (S.hero.uses[id]||0);
+  const k=SKILLS[id], cap=useCap(k); if(!cap) return Infinity;
+  return cap - (S.hero.uses[id]||0);
 }
 function spendUse(id){
-  if(SKILLS[id]&&SKILLS[id].perRound) S.hero.uses[id]=(S.hero.uses[id]||0)+1;
+  if(useCap(SKILLS[id])) S.hero.uses[id]=(S.hero.uses[id]||0)+1;
 }
 
 /* Agent 180 doesn't just strafe away between turns — a landed hit bounces it
@@ -1958,8 +2216,15 @@ function agent180Teleport(e){
   say('agent 180 blinks out of reach.');
 }
 function hurtEnemy(e,n){
+  // The Lance can't be burst down. No single blow takes more than a fifteenth
+  // of it, so the fight has to be a fight rather than one enormous opener.
+  if(e.kind==='lance'){
+    const cap=Math.max(1,Math.ceil((KINDS.lance.hp)*0.15));
+    if(n>cap) n=cap;
+  }
   e.hp-=n;
-  e.flash=performance.now();
+  e.flash=performance.now(); e.flashCol=null;   // white by default; burn re-tints after
+
   shake(Math.min(3,1+n*.4));
   addFx({type:'num',col:e.col,row:e.row,txt:'-'+n,col2:'#f0c987'});
   addFx({type:'ring',col:e.col,row:e.row,col2:'rgba(240,207,138,.9)',dur:340});
@@ -1992,13 +2257,6 @@ function hurtHero(n,src,type,from){
   const h=S.hero;
   if(h.dodge){ h.dodge=false; say(`you slip aside — the ${src} finds nothing.`);
     addFx({type:'ring',col:h.col,row:h.row,col2:'#54dbd6'}); return; }
-  if(h.returnFire){
-    h.returnFire=false;
-    say(`you throw the hit right back at the ${src}.`);
-    if(from&&from.alive) hurtEnemy(from,n);
-    addFx({type:'ring',col:h.col,row:h.row,col2:'#ff9146'});
-    return;
-  }
   if(type==='magic' && h.barrier){
     h.barrier=false;
     say('the barrier rebounds the spell.');
@@ -2012,15 +2270,39 @@ function hurtHero(n,src,type,from){
     addFx({type:'num',col:h.col,row:h.row,txt:'-'+absorb,col2:'#f0c987'});
   }
   h.hp=Math.max(0,h.hp-n);
+  // Return Fire doesn't turn the blow aside — it keeps the tab, and settles
+  // it with every foe in the room at the end of the round
+  if(h.returnFire && n>0) h.reflectPool=(h.reflectPool||0)+n;
   h.flash=performance.now(); shake(2+n);
   if(n>0) addFx({type:'num',col:h.col,row:h.row,txt:'-'+n,col2:'#ff5c6a'});
   addFx({type:'flash'});
   if(h.hp<=0){ updateHud(); gameOver(); }
 }
+/* Everything they landed this round, doubled, then split evenly over every
+   foe still standing. Splitting rather than concentrating is the point: it
+   answers a room, not a single attacker. */
+function releaseReturnFire(){
+  const h=S.hero;
+  if(!h.returnFire) return;
+  h.returnFire=false;
+  const pool=h.reflectPool||0; h.reflectPool=0;
+  const live=S.enemies.filter(e=>e.alive);
+  if(pool<=0){ say('nothing came at you — the bracing goes to waste.'); return; }
+  if(!live.length) return;
+  const total=pool*2, each=Math.max(1,Math.floor(total/live.length));
+  addFx({type:'ring',col:h.col,row:h.row,col2:'#ff9146'});
+  say(`you give back ${total} — ${each} to each of them.`);
+  for(const e of live.slice()) if(e.alive) hurtEnemy(e,each);
+  if(!S.enemies.some(e=>e.alive)&&!S.over) clearFloor();
+}
 function tickPoison(){
   for(const e of S.enemies){
     if(e.alive&&e.poison>0){ e.poison--; hurtEnemy(e,1); }
-    if(e.alive&&e.burn>0){ e.burn--; hurtEnemy(e,1); }
+    if(e.alive&&e.burn>0){
+      e.burn--; hurtEnemy(e,2);
+      // the orange beat is the whole tell that something is still alight
+      if(e.alive){ e.flash=performance.now(); e.flashCol='#ff8a2b'; }
+    }
   }
   if(!S.enemies.some(x=>x.alive)&&!S.over) clearFloor();
 }
@@ -2350,34 +2632,32 @@ function mortarAct(e){
 }
 
 /* ============================ SHRINES / ITEMS ============================ */
-/* Each shrine states plainly what it gave: a named banner on the tile plus the
-   figure, because testers picked one up and could not tell what happened. */
-const SHRINE_ROLLS=[
-  {n:'Energy Drink', gain:'+4 HP  +2 MP',
-   f:()=>{healQuiet(4); S.hero.mp=Math.min(maxMp(),S.hero.mp+2);}},
-  {n:'Pure Water',   gain:'+4 MP',
-   f:()=>{S.hero.mp=Math.min(maxMp(),S.hero.mp+4);}},
-  {n:'Cookies',      gain:'+8 HP', f:()=>healQuiet(8)},
-  {n:'Power of Fire',gain:'+2 DAMAGE / 3 ROUNDS', f:()=>{S.hero.buffs.fire=3;}},
-  {n:'Freedom of Wind',gain:'+1 MOVE / 3 ROUNDS', f:()=>{S.hero.buffs.wind=3;}},
-  {n:'Whetstone',    gain:'+1 DAMAGE, +1 GUARD', f:()=>{S.hero.buffs.whetstone=999;}},
-  {n:'Poison Heart', gain:'YOUR HITS POISON / 3 ROUNDS', f:()=>{S.hero.buffs.poison=3;}},
-  {n:'Swiftness of Lightning',gain:'ARROWS PASS YOU BY / 3 ROUNDS',
-   f:()=>{S.hero.buffs.lightning=3;}},
-];
-function healQuiet(n){          // the shrine banner reports the gain, not a float
-  S.hero.hp=Math.min(maxHp(),S.hero.hp+n);
-}
+/* A shrine hands over one free consumable — the same three the Shopkeep
+   sells honestly (not a Ramen Guy flavor; those stay something you pay to
+   gamble on). If the item slots are already full, it's salvaged for credits
+   on the spot rather than wasted, so a shrine is never a dead click. */
 function takeShrine(k){
-  const roll=SHRINE_ROLLS[Math.floor(Math.random()*SHRINE_ROLLS.length)];
+  const id=SHOP_CONSUMABLES[Math.floor(Math.random()*SHOP_CONSUMABLES.length)];
+  const c=CONSUMABLES[id];
   S.shrines.delete(k);
-  const [c,r]=k.split(',').map(Number);
-  addFx({type:'ring',col:c,row:r,col2:'#f0c987'});
-  roll.f();
+  const [col,row]=k.split(',').map(Number);
+  addFx({type:'ring',col,row,col2:'#f0c987'});
   if(tut) tut.tookShrine=true;
-  addFx({type:'pickup',col:c,row:r,name:roll.n.toUpperCase(),gain:roll.gain,dur:2000});
-  say(`${roll.n.toLowerCase()} — ${roll.gain.toLowerCase()}`);
-  updateHud();
+  let gain;
+  if(S.hero.consumables.length>=MAX_ITEMS && canSalvage(id)){
+    const val=salvageValue(id);
+    S.credits=(S.credits||0)+val;
+    spawnCreditSplash(col,row,val);
+    gain=`hands full — salvaged for ${val} credits`;
+  } else if(S.hero.consumables.length>=MAX_ITEMS){
+    gain='hands full — left where it lay';    // nothing to break a card into
+  } else {
+    S.hero.consumables.push(id);
+    gain='a consumable';
+  }
+  addFx({type:'pickup',col,row,name:c.name.toUpperCase(),gain,dur:2000});
+  say(`${c.name.toLowerCase()} — ${gain}`);
+  updateHud(); renderSlotBar();
   // last shrine gone and nothing left standing — the exit can unlock now too
   if(S.shrines.size===0 && !S.enemies.some(e=>e.alive) && !S.over) clearFloor('shrine');
 }
@@ -2457,6 +2737,22 @@ function pathTo(tc,tr){
 /* An empty room has nothing to spend a turn carefully around — clicking any
    reachable tile just walks you there, the same way clicking the open exit
    already does, instead of needing one click (and one turn-cycle) per step. */
+/* Hold until a unit's drawn position has caught up with its logical tile, so
+   a scene never opens over someone still mid-stride.
+   Polled on a timer rather than rAF on purpose: vx/vy only advance inside
+   vis(), which runs when the unit is drawn — if drawing ever stops (a
+   backgrounded tab, a curtain over the board) an rAF wait would simply never
+   come back, and the dialogue would be lost. A timer always resolves, and
+   the cap means the worst case is a slightly early open rather than none. */
+function whenSettled(u,then){
+  const t0=performance.now();
+  (function check(){
+    const near = u.vx===undefined ||
+      (Math.abs(u.col-u.vx)<0.02 && Math.abs(u.row-u.vy)<0.02);
+    if(near || performance.now()-t0>420){ then(); maybeEndTurn(); return; }
+    setTimeout(check,16);
+  })();
+}
 function walkToTile(tc,tr,onArrive){
   if(S.enemies.some(e=>e.alive)) return false;
   if(S.hero.moved||S.walking) return false;
@@ -2478,8 +2774,11 @@ function walkToTile(tc,tr,onArrive){
     if(i>=path.length){
       S.walking=false; S.hero.moved=true;
       if(tut) tut.moved=true;
-      if(onArrive) onArrive();      // before the hand-over, so a scene opens on arrival
-      maybeEndTurn();
+      // The logical tile snaps a frame before the sprite finishes easing into
+      // it, so firing straight away opens a scene over a pilgrim still mid-
+      // stride. Wait for the drawn position to actually land first.
+      if(onArrive) whenSettled(S.hero,onArrive);
+      else maybeEndTurn();
       return;
     }
     setTimeout(step,130);
@@ -2753,7 +3052,7 @@ function renderMechReplaceCards(){
   // only actives are ever full, so only actives are offered up for it
   for(const id of S.hero.skills.filter(x=>SKILLS[x].kind==='active')){
     const k=SKILLS[id];
-    const b=document.createElement('button'); b.className='card';
+    const b=document.createElement('button'); b.className='card putdown';
     b.innerHTML=`<div class="cat">${k.cat}</div><div class="nm">${k.name}</div>
       <div class="ds">${k.ds}</div>
       <span class="tag swap"><img src="${UI_ICONS.icon_replace}" alt="">give this up</span>`;
@@ -2832,7 +3131,7 @@ function renderEquipCards(){
   // otherwise a run's first three pieces lock out everything sold afterwards.
   for(const id of S.hero.equip){
     const g=EQUIPMENT[id];
-    const b=document.createElement('button'); b.className='card';
+    const b=document.createElement('button'); b.className='card putdown';
     b.innerHTML=`<div class="cat">WORN</div><div class="nm">${g.name}</div>
       <div class="ds">${g.ds}</div>
       <span class="tag swap"><img src="${UI_ICONS.icon_replace}" alt="">set it down</span>`;
@@ -2854,7 +3153,7 @@ function renderShopConsumableCards(){
   document.getElementById('sceneWho').textContent='Shopkeep';
   const cards=document.getElementById('sceneCards'); cards.innerHTML='';
   const full=S.hero.consumables.length>=MAX_ITEMS;
-  for(const id of SHOP_CONSUMABLES){
+  for(const id of MERCHANT_CONSUMABLES){
     const c=CONSUMABLES[id];
     const afford=(S.credits||0)>=c.price;
     const b=document.createElement('button'); b.className='card'+((!afford||full)?' cant':'');
@@ -2877,7 +3176,7 @@ function renderShopConsumableCards(){
   // three item slots, same problem as gear — you can put one back
   S.hero.consumables.forEach((id,i)=>{
     const c=CONSUMABLES[id];
-    const b=document.createElement('button'); b.className='card';
+    const b=document.createElement('button'); b.className='card putdown';
     b.innerHTML=`<div class="cat">CARRIED</div><div class="nm"><img class="btnIcon" src="${itemIcon(c.icon)}" alt="">${c.name}</div>
       <div class="ds">${c.ds}</div>
       <span class="tag swap"><img src="${UI_ICONS.icon_replace}" alt="">set it down</span>`;
@@ -2940,10 +3239,14 @@ function renderTownMechCards(){
   }, MECH_MAGIC_COST);
   mk('LEAVE','Walk away','Head back out.',()=>{ closeScene(); updateHud(); });
 }
+/* One upgrade per floor. Spent the moment you take one, and since the
+   Mechanic isn't seen again this build, that makes it one for the run —
+   the card greys out under your hand rather than at the next visit. */
 function renderTownUpgradeCards(){
   document.getElementById('sceneWho').textContent='Mechanic';
   const cards=document.getElementById('sceneCards'); cards.innerHTML='';
-  const afford=(S.credits||0)>=MECH_UPGRADE_COST;
+  const spent=!!S.upgradeUsed;
+  const afford=(S.credits||0)>=MECH_UPGRADE_COST && !spent;
   const priceTag=`<span class="tag swap"><img class="coinIcon" src="${UI_ICONS.icon_coin}" alt="">${MECH_UPGRADE_COST} credits</span>`;
   // stacked passives (e.g. Sharpen drafted twice) repeat the same id in
   // S.hero.skills — dedupe so each upgradeable skill gets one button, not one per copy
@@ -2957,7 +3260,9 @@ function renderTownUpgradeCards(){
       b.innerHTML=`<div class="cat">${k.cat}</div><div class="nm">${k.name} — Damage</div><div class="ds">+1 damage, permanently.</div>${priceTag}`;
       if(!afford) b.classList.add('cant');
       b.onclick=()=>{
+        if(S.upgradeUsed){ showNpcPortrait('mech_idle'); typeLine('“One at a time. Come back when you\u2019ve used it.”'); return; }
         if(!trySpend(MECH_UPGRADE_COST)){ showNpcPortrait('mech_idle'); typeLine(MECH_NOCASH_LINE); return; }
+        S.upgradeUsed=true;
         S.hero.upgrades[id]=S.hero.upgrades[id]||{};
         S.hero.upgrades[id].dmg=(S.hero.upgrades[id].dmg||0)+1;
         say(`${k.name.toLowerCase()} hits harder now.`);
@@ -2971,7 +3276,9 @@ function renderTownUpgradeCards(){
       b.innerHTML=`<div class="cat">${k.cat}</div><div class="nm">${k.name} — Range</div><div class="ds">+1 range, permanently.</div>${priceTag}`;
       if(!afford) b.classList.add('cant');
       b.onclick=()=>{
+        if(S.upgradeUsed){ showNpcPortrait('mech_idle'); typeLine('“One at a time. Come back when you\u2019ve used it.”'); return; }
         if(!trySpend(MECH_UPGRADE_COST)){ showNpcPortrait('mech_idle'); typeLine(MECH_NOCASH_LINE); return; }
+        S.upgradeUsed=true;
         S.hero.upgrades[id]=S.hero.upgrades[id]||{};
         S.hero.upgrades[id].range=(S.hero.upgrades[id].range||0)+1;
         say(`${k.name.toLowerCase()} reaches further now.`);
@@ -2989,7 +3296,7 @@ function renderTownUpgradeCards(){
 let townSkillOffer=null;
 function renderTownNewSkillCards(){
   if(!townSkillOffer){
-    const pool=['second_wind','teleport',...POOLS.mechanic].filter(id=>!S.hero.skills.includes(id));
+    const pool=['teleport',...POOLS.mechanic].filter(id=>!S.hero.skills.includes(id));
     const src=pool.slice(), ids=[];
     while(ids.length<3&&src.length) ids.push(src.splice(Math.floor(Math.random()*src.length),1)[0]);
     townSkillOffer=ids;
@@ -3194,7 +3501,7 @@ function promptReplace(){
   // only actives are ever full, so only actives are offered up for it
   for(const id of S.hero.skills.filter(x=>SKILLS[x].kind==='active')){
     const k=SKILLS[id];
-    const b=document.createElement('button'); b.className='card';
+    const b=document.createElement('button'); b.className='card putdown';
     b.innerHTML=`<div class="cat">${k.cat}</div><div class="nm">${k.name}</div>
       <div class="ds">${k.ds}</div>
       <span class="tag swap"><img src="${UI_ICONS.icon_replace}" alt="">give this up</span>`;
@@ -3212,7 +3519,7 @@ function grant(id){
   S.hero.skills.push(id);
   const k=SKILLS[id];
   say(`skill learned — ${k.name.toLowerCase()}.`);
-  if(id==='vitality') S.hero.hp=Math.min(maxHp(),S.hero.hp+2);
+  if(id==='vitality') S.hero.hp=Math.min(maxHp(),S.hero.hp+1);
   S.hero.hp=Math.min(S.hero.hp,maxHp());
   // the MP box now waits for the first time it actually matters — trying
   // to cast, not just owning the skill — see startActive()
@@ -3298,7 +3605,11 @@ function gameOver(){
 function win(){
   S.over='win'; S.phase='over'; updateHud();
   say('the lance goes quiet. the district exhales.');
-  playEndSequence();
+  // the room comes apart before the light takes it — a run of shakes, then
+  // the whiteout, so the ending arrives after the violence rather than on it
+  const gen=S.gen;
+  for(let i=0;i<6;i++) setTimeout(()=>{ if(gen===S.gen) shake(9-i); }, i*180);
+  setTimeout(()=>{ if(gen===S.gen) playEndSequence(); }, 1200);
 }
 /* Placeholder billing — real names go in when the team decides the order. */
 const CREDITS=[
@@ -3312,7 +3623,7 @@ const CREDITS=[
   ['Cutscenes',                   ['Joseph Gu']],
   ['Writing',                     ['Joseph Gu']],
   ['Music',                       ['Divyesh Khatri']],
-  ['Feedback & Playtest',         ['Zerui Li','Xin Clare Yue','Dana Tô','Abhay Kumaran','Neela Lots','Butch Nasser']],
+  ['Feedback & Playtest',         ['Zerui Li','Xin Clare Yue','Dana Tô','Abhay Kumaran','Neela Lotspeich','Butch Nasser']],
 ];
 /* The room whites out, then three beats of narration read over the white,
    each one advanced by a click — the same "click to continue" pattern every
@@ -3355,13 +3666,17 @@ function playEndSequence(){
     }
     step=i; beats[i]();
   };
-  card.onclick=()=>{
+  // Two seconds between lines whether you click through or wait — the beat
+  // is part of the ending, so clicking early only starts the handover.
+  const advance=()=>{
     if(gen!==S.gen || busy) return;
     busy=true; hideLine();
-    setTimeout(()=>{ if(gen===S.gen){ busy=false; reveal(step+1); } },350);
+    setTimeout(()=>{ if(gen===S.gen){ busy=false; reveal(step+1); } },2000);
   };
+  card.onclick=advance;
   card.classList.add('active');
-  setTimeout(()=>reveal(0), 1700);       // the first line still opens on its own, once the white settles
+  // the white gets a full three seconds to itself before anything is said
+  setTimeout(()=>reveal(0), 3000);
 }
 function rollCredits(gen){
   if(gen!==S.gen) return;
@@ -3404,29 +3719,38 @@ function showCurtain(res,poem){
               these off their moment and onto a turn where they read as
               nonsense. A `when` beat times itself. */
 const TUT_MOVE=[
+ // noDim + lift: the darkened board and the tile-under-sprite ring both read
+ // as "something is wrong here" on the very first thing the player sees —
+ // these two just want a beat of quiet reading, board fully visible.
  {txt:'You. The pilgrim.', go:'Click a glowing tile to step', at:'hero',
+  noDim:true, lift:20,
   done:()=>tut.moved},
  {txt:'When there are no enemies, click any tile to go there automatically.', at:'hero',
+  noDim:true, lift:20,
   done:()=>false},
- {txt:'A shrine.', go:'Step onto the diamond', at:'shrine',
+ {txt:'Free loot.', go:'Step onto the diamond', at:'shrine',
   gate:()=>S.shrines.size>0,
   done:()=>S.shrines.size===0},
- // only worth saying to someone who just picked one up
- {txt:'Shrines give you something — a heal, or an edge.', at:'hero',
+ // only worth saying to someone who just picked one up — pointed at the
+ // item slot itself, since that's where the thing they just heard about
+ // actually landed
+ {txt:"It's a consumable.", go:'Hover over it to see what it does', at:'itemSlot',
   gate:()=>!!tut.tookShrine,
   done:()=>false, skipGateAfter:true},
  {txt:'Now walk to the gate.', go:'Hint: tap on the gate once it opens', at:'goal',
+  noDim:true, dismissOnTarget:true,
   done:()=>false, gate:()=>exitIsOpen()},
 ];
 const TUT_FIGHT=[
- {txt:'A goon. Close the gap.', go:'Step until you are beside it', at:'enemy',
+ {txt:'An enemy. Close the gap.', go:'Step until you are beside it', at:'enemy',
+  dismissOnTarget:true,
   gate:()=>S.enemies.some(e=>e.alive),
   done:()=>{const e=S.enemies.find(x=>x.alive); return e&&cheb(S.hero,e)<=heroRange();}},
  /* Testers finished the game without realising a turn holds BOTH actions.
     Said at the exact moment it is true: they have moved, and the strike is
     still sitting there unused. If they never spend a turn in that state —
     they struck without moving, say — the lesson simply never comes up. */
- {txt:'You moved — and you can still strike.', go:'A turn holds both', at:'hero',
+ {txt:'You moved — but you can still strike.', go:'A turn holds both', at:'hero',
   when:()=>S.hero.moved && !S.hero.struck && S.attackable.size>0,
   done:()=>tut.struck},
  {txt:'Strike it.', go:'Click the goon, or the Strike button', at:'enemy',
@@ -3436,12 +3760,10 @@ const TUT_FIGHT=[
  {txt:'It hits back. Finish it.', at:'enemy',
   when:()=>tut.struck && S.enemies.some(e=>e.alive),
   done:()=>!S.enemies.some(e=>e.alive)},
- {txt:'Clear a level and you earn a skill.', at:'hero',
-  gate:()=>!S.enemies.some(e=>e.alive),
-  done:()=>false},
 ];
 const TUT=TUT_MOVE;   // replaced per level in tutorialCheck
 function tutorialCheck(){
+  tutClickTarget=null;    // reset first; only a dismissOnTarget beat re-arms it below
   if(!tut){ renderBubbles([]); return; }
   const SET = tut.mode==='fight' ? TUT_FIGHT : TUT_MOVE;
   if(S.round>(tut.gateRound??-1)) tut.gateRound=null;   // the held round has passed
@@ -3470,8 +3792,13 @@ function tutorialCheck(){
      that instant is exactly how it ended up describing something untrue. */
   if(tut.gateRound!=null && !cur.when){ renderBubbles([]); return; }
   if(!tut.shownAt) tut.shownAt=performance.now();
+  // The item-slot beat points at chrome below the board, not a tile — it
+  // carries no c/r at all, and renderBubbles routes it to the docked bubble
+  // instead of the canvas-anchored one.
+  const isItemSlot = cur.at==='itemSlot';
   let c,r;
-  if(cur.at==='hero'){ c=S.hero.col; r=S.hero.row; }
+  if(isItemSlot){ /* no tile */ }
+  else if(cur.at==='hero'){ c=S.hero.col; r=S.hero.row; }
   else if(cur.at==='shrine'){
     const k=[...S.shrines][0];
     if(!k){ c=S.hero.col; r=S.hero.row; }
@@ -3487,14 +3814,20 @@ function tutorialCheck(){
   // included: skipping the re-render is also skipping the only code that drops
   // a dismissed pinned box out of the DOM and recomputes bubbleBlocking. Leave
   // `pinned` out of it and clicking the MP box on a tutorial floor does nothing.
-  const sig=tut.mode+':'+idx+':'+c+','+r+(pinned?':pinned':'');
+  const sig=tut.mode+':'+idx+':'+(isItemSlot?'item':c+','+r)+(pinned?':pinned':'');
   if(sig===tutShown) return;
   tutShown=sig;
-  renderBubbles([{c,r,txt:cur.txt,go:cur.go,onDismiss:()=>{
+  const onDismiss=()=>{
     tut.step=idx+1;                                 // idx, not step — beats may have been passed
     if(!cur.skipGateAfter) tut.gateRound=S.round;   // some beats lead straight into the next
     tut.shownAt=performance.now(); tutShown=null; tutorialCheck();
-  }}]);
+  };
+  // A beat may also be dismissed by clicking the very tile it's talking
+  // about (the gate, the enemy) — recognised in the canvas click handler.
+  tutClickTarget = (cur.dismissOnTarget && !isItemSlot) ? {c,r,onDismiss} : null;
+  renderBubbles([isItemSlot
+    ? {dom:'itemSlot', txt:cur.txt, go:cur.go, onDismiss}
+    : {c,r,txt:cur.txt,go:cur.go,noDim:cur.noDim,lift:cur.lift,onDismiss}]);
 }
 /* Every tile a bubble must never land on: shrines, living foes, the pilgrim,
    any NPC, and the exit. `excludeKey` is the tile the bubble is actually
@@ -3524,11 +3857,20 @@ function addDismissTri(d,onDismiss){
 function renderBubbles(list){
   const box=document.getElementById('bubbles');
   box.innerHTML='';
+  const itemBox=document.getElementById('itemBubble');
+  itemBox.className='bubble dock'; itemBox.innerHTML=''; itemBox.style.display='none';
   // whatever the box is pointing at on the board stays lit when the dim
-  // comes up — a pinned (panel-anchored) box has no tile to point at
+  // comes up — a pinned (panel-anchored) or item-slot-docked box has no tile
   const first=list&&list[0];
   tutHighlightTile = (first&&first.c!=null) ? {c:first.c,r:first.r} : null;
+  tutNoDim = !!(first&&first.noDim);
   for(const b of (list||[])){
+    if(b.dom==='itemSlot'){            // docked below the board, not on it
+      itemBox.innerHTML=`${b.txt}${b.go?`<span class="go">${b.go}</span>`:''}`;
+      addDismissTri(itemBox,b.onDismiss);
+      itemBox.style.display='block';
+      continue;
+    }
     const d=document.createElement('div'); d.className='bubble';
     if(b.x!=null){                                  // pinned to the panel
       d.style.left=b.x+'%'; d.style.top=b.y+'%';
@@ -3542,7 +3884,11 @@ function renderBubbles(list){
       const below = b.r<=1 || (upBlocked && !downBlocked);
       d.className='bubble'+(below?' below':'');
       d.style.left=cx(b.c)/W*100+'%';
-      d.style.top =((below? tileY(b.r)+TILE+5 : tileY(b.r)-5)/H*100)+'%';
+      // `lift` pulls the box further from the tile than the default gap —
+      // used where the sprite standing there now reaches higher than the
+      // old fixed 5px ever anticipated
+      const gap=5+(b.lift||0);
+      d.style.top =((below? tileY(b.r)+TILE+5 : tileY(b.r)-gap)/H*100)+'%';
     }
     d.innerHTML=`${b.txt}${b.go?`<span class="go">${b.go}</span>`:''}`;
     addDismissTri(d,b.onDismiss);
@@ -3557,14 +3903,17 @@ function renderBubbles(list){
   }
   // While any dismissible box is up, that's the only thing you can act on —
   // movement, strikes and skills all wait for the triangle to be clicked.
-  bubbleBlocking = box.children.length>0;
-  // the board visibly stands down while a box is waiting on them
-  document.getElementById('stage').classList.toggle('awaiting', bubbleBlocking);
+  bubbleBlocking = box.children.length>0 || itemBox.style.display==='block';
+  // the board visibly stands down while a box is waiting on them — except
+  // the noDim beats, which want the board left exactly as it reads normally
+  document.getElementById('stage').classList.toggle('awaiting', bubbleBlocking && !tutNoDim);
   renderSlotBar();
 }
 /* One-off just-in-time lessons: a mechanic is explained the first time it can
    actually be used, anchored to the meter it concerns — never up front. */
-let pinned=null, taught={}, bubbleBlocking=false, tutHighlightTile=null;
+let pinned=null, taught={}, bubbleBlocking=false, tutHighlightTile=null, tutNoDim=false;
+// the tile a blocked click may dismiss the current bubble by hitting directly
+let tutClickTarget=null;
 function teach(id,txt,go,x,y,below){
   if(taught[id]) return; taught[id]=true;
   pinned={txt,go,x,y,below,onDismiss:()=>{ pinned=null; tutorialCheck(); }};
@@ -3583,8 +3932,6 @@ function noteTrouble(kind){
      doing fine. Re-run the model after any balance change. */
   if(kind==='shelled' && t.shelled>=2)
     nudge('t_shell','The shell lands where you last stood.','Step every turn');
-  if(kind==='sniped' && t.sniped>=5)
-    nudge('t_cover','Walls break its line of sight.','Advance behind cover');
   if(kind==='glance' && t.glance>=3)
     nudge('t_armour','Armour turns a single blade.','Magic, or more strikes');
 }
@@ -3607,16 +3954,20 @@ function pipWidthFor(count,refCount,gap){
   const refWidth=refCount*REF_PIP_W+(refCount-1)*gap;
   return Math.max(3,(refWidth-(count-1)*gap)/count);
 }
-function pips(el,n,max,cls,label){
+function pips(el,n,max,cls,label,shield){
   el.innerHTML='';
   if(label){ const t=document.createElement('span');
     t.textContent=label; t.style.cssText=
       'font-size:8px;letter-spacing:.14em;opacity:.5;margin-right:4px;align-self:center';
     el.appendChild(t); }
-  const w=pipWidthFor(max, cls==='mp'?BASE.mp:BASE.hp, 4);
+  const w=pipWidthFor(max+(shield||0), cls==='mp'?BASE.mp:BASE.hp, 4);
   for(let i=0;i<max;i++){ const d=document.createElement('div');
     d.className='pip'+(cls?' '+cls:'')+(i<n?'':' off');
     d.style.width=w+'px'; el.appendChild(d); }
+  // the shield rides on the end of the same row, so losing it reads as the
+  // yellow burning off before the cyan starts going
+  for(let i=0;i<(shield||0);i++){ const d=document.createElement('div');
+    d.className='pip shield'; d.style.width=w+'px'; el.appendChild(d); }
 }
 function updateHud(){
   const h=S.hero;
@@ -3625,7 +3976,7 @@ function updateHud(){
   document.getElementById('hCredits').innerHTML=
     `<img class="coinIcon" src="${UI_ICONS.icon_coin}" alt="">CREDITS · ${S.credits||0}`;
   setSceneCredits();                       // keeps an open stall's purse in step
-  pips(document.getElementById('hHp'),h.hp,maxHp(),'','HP');
+  pips(document.getElementById('hHp'),h.hp,maxHp(),'','HP',h.tempHp||0);
   pips(document.getElementById('hMp'),h.mp,maxMp(),'mp','MP');
   const boss=S.enemies.find(e=>e.alive&&e.boss);
   const hBoss=document.getElementById('hBoss');
@@ -3647,7 +3998,7 @@ function updateHud(){
   if(h.dodge) b.push('DODGE READY'); if(h.barrier) b.push('BARRIER');
   if(h.returnFire) b.push('RETURN FIRE READY');
   if(h.regen>0) b.push('REGEN·'+h.regen);
-  if(h.tempHp>0) b.push('+'+h.tempHp+' BONUS HP');
+  if(h.tempHp>0) b.push('SHIELD·'+h.tempHp);
   if(h.ramenBeef>0) b.push('DOUBLE DMG CHANCE·'+h.ramenBeef);
   document.getElementById('hBuff').textContent=b.join('  ');
 
@@ -3785,8 +4136,9 @@ function resolveActive(id,tile){
       const nc=e.col+dc, nr=e.row+dr;
       if(passable(nc,nr,e)){ e.col=nc; e.row=nr; }
     }
-    // the Mechanic's incendiary shot: a 1-in-5 chance to catch light
-    if(id==='incendiary_shot' && e.alive && Math.random()<0.2){
+    // the Mechanic's incendiary shot always catches — that certainty is what
+    // it trades its damage and its once-a-floor use for
+    if(id==='incendiary_shot' && e.alive){
       e.burn=(e.burn||0)+3;
       say('the shot catches — it burns.');
     }
@@ -3803,17 +4155,26 @@ function useActive(id){
   spendUse(id);
   if(id==='dodge'){ h.dodge=true; say('you set your feet — the next blow will miss.'); }
   if(id==='magic_barrier'){ h.barrier=true; say('a barrier hums into place.'); }
-  if(id==='return_fire'){ h.returnFire=true; say('you ready yourself — the next hit goes right back.'); }
-  if(id==='second_wind'){ h.regen=5; heal(2,'second wind'); }
-  if(id==='healing'){ heal(maxHp(),'healing'); }
+  if(id==='return_fire'){ h.returnFire=true; h.reflectPool=0;
+    say('you brace. everything they land this round comes back doubled.'); }
   updateHud();
 }
 /* Two yellow ACTION slots (the active skills you can trigger — same click,
    uses-left and MP-cost logic the old text buttons had) and three purple
    ITEM slots (reserved; nothing occupies these yet). */
+function showSlotTip(btn,c){
+  const tip=document.getElementById('slotTip'); if(!tip) return;
+  tip.innerHTML=`<b>${c.name}</b>${c.ds}`;
+  tip.style.left=(btn.offsetLeft+btn.offsetWidth/2)+'px';
+  tip.style.display='block';
+}
+function hideSlotTip(){
+  const tip=document.getElementById('slotTip'); if(tip) tip.style.display='none';
+}
 function renderSlotBar(){
   const el=document.getElementById('slotBar'); if(!el) return;
   el.innerHTML='';
+  hideSlotTip();
   const h=S.hero, playing=S.phase==='player'&&!S.over&&!bubbleBlocking;
   const actives=S.hero.skills.filter(id=>SKILLS[id].kind==='active');
   for(let i=0;i<MAX_ACTIVES;i++){
@@ -3846,17 +4207,41 @@ function renderSlotBar(){
       d.textContent='—'; el.appendChild(d); continue;
     }
     const c=CONSUMABLES[id];
-    const b=document.createElement('button'); b.className='sqSlot item';
+    const b=document.createElement('button'); b.className='sqSlot item'+(salvageMode?' salvage':'');
     b.innerHTML=`<img src="${itemIcon(c.icon)}" alt="">`+
       `<div class="nm">${c.name}</div>`;
-    b.title=`${c.name} — ${c.ds}`;
     b.disabled = !playing;
-    b.onclick=()=>{
-      h.consumables.splice(i,1);
-      useConsumable(id);
-    };
+    if(salvageMode){
+      const val=salvageValue(id), sellable=canSalvage(id);
+      b.title = sellable ? `Salvage ${c.name} — +${val} credits`
+                         : `${c.name} can't be salvaged — it already is money`;
+      if(!sellable) b.classList.add('nosell');
+      b.onclick=()=>{
+        if(!sellable){ say(`the ${c.name.toLowerCase()} is money — there's nothing to break it down into.`); return; }
+        h.consumables.splice(i,1);
+        S.credits=(S.credits||0)+val;
+        // paid out the same way a kill is, so the credits line jumping has a
+        // cause you can see
+        spawnCreditSplash(h.col,h.row,val);
+        say(`salvaged ${c.name.toLowerCase()} — +${val} credits.`);
+        salvageMode=false;
+        updateHud(); renderSlotBar();
+      };
+    } else {
+      b.title=`${c.name} — ${c.ds}`;
+      b.onclick=()=>{
+        h.consumables.splice(i,1);
+        useConsumable(id);
+      };
+    }
+    b.onmouseenter=()=>showSlotTip(b,c);
+    b.onmouseleave=hideSlotTip;
+    b.onfocus=()=>showSlotTip(b,c);
+    b.onblur=hideSlotTip;
     el.appendChild(b);
   }
+  const salvageBtn=document.getElementById('btnSalvage');
+  if(salvageBtn){ salvageBtn.classList.toggle('armed',salvageMode); salvageBtn.disabled=!playing; }
 }
 
 /* ============================ RENDER ============================ */
@@ -4320,14 +4705,16 @@ function drawNpcs(now){
     }
   }
 }
-/* a struck body blanches for a beat — the hit reads on the sprite itself */
+/* a struck body blanches for a beat — the hit reads on the sprite itself.
+   Burning bodies flash orange instead, so a wound and a fire never look the
+   same at a glance. */
 function withFlash(u,now,draw){
   const on = u.flash && now-u.flash<160;
   draw();
   if(on){
     ctx.save(); ctx.globalCompositeOperation='source-atop';
     ctx.globalAlpha=.75*(1-(now-u.flash)/160);
-    ctx.fillStyle='#fff';
+    ctx.fillStyle=u.flashCol||'#fff';
     const vx=u.vx!==undefined?u.vx:u.col, vy=u.vy!==undefined?u.vy:u.row;
     ctx.fillRect(pxOf(vx)-11,pyOf(vy)-2,22,TILE+4);
     ctx.restore(); ctx.globalAlpha=1;
@@ -4594,9 +4981,18 @@ function drawFog(now){
     ctx.fillRect(tileX(c),tileY(r),TILE,TILE);
   }
 }
+/* The soft pulsing ring alone — no dimming. Shared by the darkened case
+   below and by the noDim beats, which want the ring without the dark. */
+function drawTutorialRing(now){
+  if(!tutHighlightTile) return;
+  const {c,r}=tutHighlightTile;
+  const pulse=.5+.5*Math.sin(now/260);
+  ctx.strokeStyle=`rgba(240,201,135,${(0.55+0.35*pulse).toFixed(2)})`;
+  ctx.lineWidth=2;
+  ctx.strokeRect(tileX(c)+1.5,tileY(r)+1.5,TILE-3,TILE-3);
+}
 /* While a tutorial box holds the floor, the board dims — except the one
-   tile it's actually talking about, which stays lit and gets a soft
-   pulsing ring so it's obvious what "it" refers to. */
+   tile it's actually talking about, which stays lit and gets the ring. */
 function drawTutorialDim(now){
   const gw=COLS*TILE, gh=ROWS*TILE;
   ctx.fillStyle='rgba(4,2,10,.6)';
@@ -4608,13 +5004,7 @@ function drawTutorialDim(now){
     if(tutHighlightTile && c===tutHighlightTile.c && r===tutHighlightTile.r) continue;
     ctx.fillRect(tileX(c),tileY(r),TILE,TILE);
   }
-  if(tutHighlightTile){
-    const {c,r}=tutHighlightTile;
-    const pulse=.5+.5*Math.sin(now/260);
-    ctx.strokeStyle=`rgba(240,201,135,${(0.55+0.35*pulse).toFixed(2)})`;
-    ctx.lineWidth=2;
-    ctx.strokeRect(tileX(c)+1.5,tileY(r)+1.5,TILE-3,TILE-3);
-  }
+  drawTutorialRing(now);
 }
 function frame(now){
   turnWatchdog(now);
@@ -4642,12 +5032,16 @@ function frame(now){
     ctx.drawImage(bg,0,0);
     if(sceneShowing()) drawStall(now);        // the opening set, not the board
     else {
-      drawBoard(now); drawTokens(now); drawFx(now);
+      drawBoard(now);
+      // noDim beats: the ring alone, drawn before the sprite so it sits
+      // under her feet rather than stamped over her like every other beat's
+      if(bubbleBlocking && tutNoDim) drawTutorialRing(now);
+      drawTokens(now); drawFx(now);
       const fade=S.darkFade===undefined?1:S.darkFade;
       if(!S.over && FLOORS[S.floor] && FLOORS[S.floor].dark && fade>0){
         ctx.save(); ctx.globalAlpha=fade; drawFog(now); ctx.restore();
       }
-      if(bubbleBlocking) drawTutorialDim(now);
+      if(bubbleBlocking && !tutNoDim) drawTutorialDim(now);
     }
   }
   drawParticles();
@@ -4668,6 +5062,12 @@ cv.addEventListener('mouseleave',()=>hover=null);
 cv.addEventListener('click',ev=>{
   if(S.over){ restart(); return; }
   if(bubbleBlocking){                               // the tutorial box has the floor
+    // a few beats can also be waved off by clicking the very thing they're
+    // pointing at (the gate, the enemy) — not just the box's own triangle
+    const t=pointToTile(ev);
+    if(tutClickTarget && t && t.col===tutClickTarget.c && t.row===tutClickTarget.r){
+      tutClickTarget.onDismiss(); tutClickTarget=null; return;
+    }
     // their click was real — bounce the box so they see where it must go
     for(const el of document.querySelectorAll('.bubble.clickable')){
       el.classList.remove('nudge'); void el.offsetWidth; el.classList.add('nudge');
@@ -4709,6 +5109,7 @@ cv.addEventListener('click',ev=>{
 });
 document.getElementById('curtain').addEventListener('click',restart);
 document.getElementById('btnEnd').onclick=endTurn;
+document.getElementById('btnSalvage').onclick=toggleSalvage;
 document.getElementById('btnRestart').onclick=restart;
 document.getElementById('btnRestart').innerHTML=
   `<img class="btnIcon" src="${UI_ICONS.icon_restart}" alt="">Restart Run`;
@@ -4749,9 +5150,30 @@ function restart(){
   document.getElementById('endHint').classList.remove('show');
   const endCard=document.getElementById('endCard');
   endCard.classList.remove('active'); endCard.onclick=null;
+  document.getElementById('bossTitle').classList.remove('play');
+  salvageMode=false; tutClickTarget=null;
   loadFloor(0);
 }
-document.getElementById('credits').addEventListener('click',restart);
+/* Out of the credits and back to the title, rather than straight into another
+   run — the roll is the end of the thing, so it hands back to the front door.
+   Fades through black so the board being rebuilt underneath is never seen. */
+function toTitle(){
+  elFader.classList.add('on');
+  setTimeout(()=>{
+    document.getElementById('credits').className='curtain credits';
+    document.getElementById('creditsRoll').innerHTML='';
+    restart();                                   // rebuild floor 0 behind the black
+    titleMode=true;
+    document.getElementById('wrap').classList.add('titling');
+    elTitle.className='curtain title show';
+    setTimeout(()=>elFader.classList.remove('on'),80);
+  },760);
+}
+document.getElementById('credits').addEventListener('click',toTitle);
+// and if it is left to play out, the roll finishing does the same thing
+document.getElementById('creditsRoll').addEventListener('animationend',ev=>{
+  if(ev.animationName==='roll') toTitle();
+});
 document.getElementById('scene').addEventListener('click',ev=>{
   if(ev.target.closest('.card')||ev.target.closest('button')) return;
   advanceScene();
