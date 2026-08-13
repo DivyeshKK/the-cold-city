@@ -32,7 +32,7 @@
     background:radial-gradient(120% 90% at 50% -10%, #1a0f2b 0%, #0e0716 55%, #080410 100%);
     min-height:100dvh;
   }
-  .titlebar{margin-bottom:10px}
+  .titlebar{margin-bottom:10px;text-align:center}
   .titlebar h1{font-family:var(--display);font-size:26px;font-weight:600;letter-spacing:.22em;margin:0;
     text-transform:uppercase}
 
@@ -225,20 +225,20 @@
   .wrap.titling .titleInner{transform:scale(var(--title-counter,1));
     transform-origin:center center}
   .curtain.title{z-index:24;backdrop-filter:none;padding:0;
-    background:linear-gradient(180deg,rgba(6,3,14,.86) 0%,rgba(6,3,14,.35) 34%,
-      rgba(6,3,14,0) 52%,rgba(6,3,14,.55) 82%,rgba(6,3,14,.92) 100%)}
+    background:linear-gradient(180deg,rgba(6,3,14,.86) 0%,rgba(6,3,14,.4) 30%,
+      rgba(6,3,14,.32) 52%,rgba(6,3,14,.62) 82%,rgba(6,3,14,.92) 100%)}
   .titleInner{text-align:center;padding:0 18px}
-  .titleName{display:inline-block;font-family:var(--display);font-size:38px;
-    letter-spacing:.16em;text-transform:uppercase;color:var(--ink);line-height:1.1;
+  .titleName{display:inline-block;font-family:var(--display);font-size:42px;
+    letter-spacing:.16em;text-transform:uppercase;color:var(--ink);line-height:1.15;
     cursor:pointer;user-select:none;-webkit-user-select:none;
     text-shadow:0 0 18px rgba(84,219,214,.28),0 3px 0 rgba(0,0,0,.6);
     transition:transform .18s ease,text-shadow .18s ease}
   .titleName:hover{transform:scale(1.045);text-shadow:0 0 28px rgba(84,219,214,.5),0 3px 0 rgba(0,0,0,.6)}
   .titleName.press{transform:scale(1.1)}
-  .titleSub{margin-top:7px;font-size:9px;letter-spacing:.34em;text-transform:uppercase;
+  .titleSub{margin-top:14px;font-size:11px;letter-spacing:.34em;text-transform:uppercase;
     color:var(--faint)}
-  .titleBtns{margin-top:30px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
-  .titleBtn{font-size:12px;letter-spacing:.2em;padding:11px 20px;
+  .titleBtns{margin-top:36px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+  .titleBtn{font-size:12px;letter-spacing:.2em;padding:11px 20px;min-width:132px;
     background:rgba(12,7,22,.8);border-color:rgba(84,219,214,.35)}
   .titleBtn:hover:not(:disabled){background:rgba(84,219,214,.16)}
   /* the nag: snaps in on the 20th click, then takes its time going away */
@@ -604,6 +604,18 @@
       </div>
     </div>
 
+    <!-- View-only: what's equipped and which passives are owned. No
+         purchase/removal actions live here — that stays on the Shopkeep's
+         management screens. -->
+    <div class="curtain" id="statusPanel">
+      <div>
+        <div class="curtainTitle">Equipment &amp; Passives</div>
+        <div class="draftSub">What you're carrying and what it does.</div>
+        <div class="cards" id="statusCards"></div>
+        <div class="again">CLICK ANYWHERE TO CLOSE</div>
+      </div>
+    </div>
+
     <div class="whiteout" id="whiteout"></div>
     <div class="endCard" id="endCard">
       <div class="endLine" id="endLine"></div>
@@ -648,6 +660,7 @@
     <span id="strikeBtns" class="strikeRow"></span>
     <button id="btnEnd">End Turn ␣</button>
     <div class="spacer"></div>
+    <button id="btnStatus" title="View your equipment and passive skills">Loadout</button>
     <button id="btnSalvage" title="Trade a carried item for credits">Salvage</button>
     <button id="btnRestart">Restart Run</button>
   </div>
@@ -1110,6 +1123,53 @@ function toggleSalvage(){
   say('choose an item to salvage for credits.');
   renderSlotBar();
 }
+
+/* Loadout: a read-only look at gear bought from the Shopkeep and passives
+   drafted after a floor — neither has a home in the bottom HUD (actives and
+   consumables already fill it), so without this there's no way to check
+   what a piece of gear does mid-run short of walking back to the merchant.
+   Just a look, never an action — Set It Down stays on the Shopkeep's
+   management screens, not here. */
+function renderStatusCards(){
+  const cards=document.getElementById('statusCards'); cards.innerHTML='';
+  const passiveCounts={};
+  for(const id of S.hero.skills){
+    if(SKILLS[id].kind==='passive') passiveCounts[id]=(passiveCounts[id]||0)+1;
+  }
+  const passiveIds=Object.keys(passiveCounts);
+  if(!S.hero.equip.length && !passiveIds.length){
+    const empty=document.createElement('div'); empty.className='draftOwned';
+    empty.textContent='Nothing carried yet.';
+    cards.appendChild(empty);
+    return;
+  }
+  for(const id of S.hero.equip){
+    const g=EQUIPMENT[id];
+    const d=document.createElement('div'); d.className='card';
+    d.innerHTML=`<div class="cat">EQUIPMENT</div><div class="nm">${g.name}</div><div class="ds">${g.ds}</div>`;
+    cards.appendChild(d);
+  }
+  for(const id of passiveIds){
+    const k=SKILLS[id], n=passiveCounts[id];
+    const d=document.createElement('div'); d.className='card';
+    d.innerHTML=`<div class="cat">PASSIVE</div><div class="nm">${k.name}</div><div class="ds">${k.ds}</div>`+
+      (n>1?`<span class="tag">×${n}</span>`:'');
+    cards.appendChild(d);
+  }
+}
+// Guards against stacking on top of the draft/scene/win curtains, which
+// share the same overlay layer — this one only opens when none of them do.
+function openStatusPanel(){
+  if(sceneShowing()) return;
+  if(document.getElementById('draft').className.includes('show')) return;
+  if(document.getElementById('curtain').className.includes('show')) return;
+  renderStatusCards();
+  document.getElementById('statusPanel').className='curtain show';
+}
+function closeStatusPanel(){
+  document.getElementById('statusPanel').className='curtain';
+}
+document.getElementById('statusPanel').addEventListener('click',closeStatusPanel);
 
 /* Icon glyphs for the ACTION slots — hand-drawn set, one per skill where
    the team drew one; skills without a dedicated icon borrow the closest
@@ -1831,6 +1891,11 @@ const WALL_SPRITE_POOL=[
   'wall_barrel','wall_trash'];
 // the Mechanic keeps a few things burning instead of plain crates
 const BURN_TRASH_POOL=['burn_trash1','burn_trash2','burn_trash3'];
+/* Every npcRoom is built around someone the player is meant to talk to —
+   Shopkeep, Mechanic, or Ramen Guy — so the exit on all of them holds shut
+   for the conversation. `npcKinds` defaults to a lone Shopkeep the same
+   way the room generator already does (see the `kinds` fallback below). */
+const floorNeedsTalk = F => !!(F.npcRoom && (F.npcKinds||['shopkeep']).length);
 function loadFloor(i){
   const F=FLOORS[i];
   applyBoardSize(i);                            // the room's size and its dressing's scale, before anything else
@@ -1848,11 +1913,12 @@ function loadFloor(i){
   S.scorched=new Map();
   S.npcs = (gen.npcs||[]).map(n=>({col:n.col,row:n.row,kind:n.kind,talkFrame:null}));
   S.decor = gen.decor||[];
-  // floor 0: no foes, no exit until the shrine's gone too. a mechanic's room:
-  // no foes either, but the exit stays shut until his favor is done — unless
-  // the favor is already behind you (the Town's mechanic doesn't re-gate).
-  const hasMechanic = !!(F.npcKinds && F.npcKinds.includes('mechanic')) && !S.mechFavorDone;
-  S.exitOpen = !gen.enemies.length && (i!==0 || !gen.shrines.length) && !hasMechanic;
+  // floor 0: no foes, no exit until the shrine's gone too. Any room built
+  // around an NPC/Shopkeep holds the exit shut the same way — walking past
+  // them isn't enough, the scripted conversation has to actually finish
+  // (see floorTalkDone, set in drawScene) before the way out opens.
+  S.floorTalkDone=false;
+  S.exitOpen = !gen.enemies.length && (i!==0 || !gen.shrines.length) && !floorNeedsTalk(F);
   S.enemies=gen.enemies.map(({kind,col,row,over},n)=>{
     const K={...KINDS[kind],...(over||{})};      // per-floor stat overrides
     const bd = K.bd + (K.boss?0:VETERAN(i));     // deeper foes hit harder
@@ -2709,11 +2775,14 @@ function clearFloor(reason){
   // the first level's whole lesson is "the shrine matters" — the road out
   // stays shut until it's been picked up, no matter how empty the room is
   if(S.floor===0 && S.shrines.size>0) return;
-  // the Mechanic's room: no foes to clear, but no favor means no gate either
-  if(F.npcKinds && F.npcKinds.includes('mechanic') && !S.mechFavorDone) return;
+  // an NPC room: no foes to clear, but no finished conversation means no
+  // gate either — this is the safety net; drawScene is what actually flips
+  // floorTalkDone once the scripted lines run out
+  if(floorNeedsTalk(F) && !S.floorTalkDone) return;
   S.exitPending=true;
   say(reason==='shrine' ? 'the shrine settles, quiet now.'
     : reason==='favor'  ? 'somewhere behind the wall, a switch clunks over.'
+    : reason==='talk'   ? 'they step aside — the way through is yours.'
     : 'the last of them falls.');
   const gen=S.gen;
   setTimeout(()=>{
@@ -3103,6 +3172,10 @@ function renderMechReplaceCards(){
 function finishMechFavor(id){
   grant(id);
   S.mechFavorDone=true;
+  // Hearing him out isn't enough here — picking a favor is the actual ask,
+  // so this floor's completion point is this function, not the generic
+  // "scripted lines ran out" moment drawScene watches for everyone else.
+  S.floorTalkDone=true;
   mechOffer=null;
   openScene(SCENE2_MECH_OUTRO,null);
   clearFloor('favor');
@@ -3165,6 +3238,25 @@ function renderEquipCards(){
   }
   // Three slots is a hard cap, so what you're wearing has to be undoable —
   // otherwise a run's first three pieces lock out everything sold afterwards.
+  // That management lives on its own screen now, not mixed into the buy
+  // list — right after a purchase this used to show the very thing you
+  // just bought with a "set it down" option sitting beside it, which read
+  // like a buy-then-undo loop rather than a shop.
+  if(S.hero.equip.length){
+    const manage=document.createElement('button'); manage.className='card';
+    manage.innerHTML=`<div class="cat">GEAR</div><div class="nm">What You're Wearing</div>
+      <div class="ds">${equipCount()}/${MAX_EQUIP} carried — set a piece down here.</div>`;
+    manage.onclick=renderEquipManageCards;
+    cards.appendChild(manage);
+  }
+  const back=document.createElement('button'); back.className='card';
+  back.innerHTML=`<div class="cat">BACK</div><div class="nm">Step back</div><div class="ds">See what else he has.</div>`;
+  back.onclick=()=>{ equipOffer=null; renderShopMenu(); };
+  cards.appendChild(back);
+}
+function renderEquipManageCards(){
+  document.getElementById('sceneWho').textContent='Shopkeep';
+  const cards=document.getElementById('sceneCards'); cards.innerHTML='';
   for(const id of S.hero.equip){
     const g=EQUIPMENT[id];
     const b=document.createElement('button'); b.className='card putdown';
@@ -3176,13 +3268,13 @@ function renderEquipCards(){
       S.hero.hp=Math.min(S.hero.hp,maxHp());
       say(`you set aside ${g.name.toLowerCase()}.`);
       showNpcPortrait('merch_idle'); typeLine('“Suit yourself.”');
-      updateHud(); renderEquipCards();
+      updateHud(); renderEquipManageCards();
     };
     cards.appendChild(b);
   }
   const back=document.createElement('button'); back.className='card';
-  back.innerHTML=`<div class="cat">BACK</div><div class="nm">Step back</div><div class="ds">See what else he has.</div>`;
-  back.onclick=()=>{ equipOffer=null; renderShopMenu(); };
+  back.innerHTML=`<div class="cat">BACK</div><div class="nm">Step back</div><div class="ds">Back to the gear stall.</div>`;
+  back.onclick=renderEquipCards;
   cards.appendChild(back);
 }
 function renderShopConsumableCards(){
@@ -3209,7 +3301,26 @@ function renderShopConsumableCards(){
     };
     cards.appendChild(b);
   }
-  // three item slots, same problem as gear — you can put one back
+  // three item slots, same problem as gear — you can put one back. That
+  // management lives on its own screen now, not mixed into the buy list —
+  // right after a purchase this used to show the very thing you just
+  // bought with a "set it down" option sitting beside it, which read like
+  // a buy-then-undo loop rather than a shop.
+  if(S.hero.consumables.length){
+    const manage=document.createElement('button'); manage.className='card';
+    manage.innerHTML=`<div class="cat">SUPPLIES</div><div class="nm">What You're Carrying</div>
+      <div class="ds">${S.hero.consumables.length}/${MAX_ITEMS} carried — set one down here.</div>`;
+    manage.onclick=renderConsumableManageCards;
+    cards.appendChild(manage);
+  }
+  const back=document.createElement('button'); back.className='card';
+  back.innerHTML=`<div class="cat">BACK</div><div class="nm">Step back</div><div class="ds">See what else he has.</div>`;
+  back.onclick=renderShopMenu;
+  cards.appendChild(back);
+}
+function renderConsumableManageCards(){
+  document.getElementById('sceneWho').textContent='Shopkeep';
+  const cards=document.getElementById('sceneCards'); cards.innerHTML='';
   S.hero.consumables.forEach((id,i)=>{
     const c=CONSUMABLES[id];
     const b=document.createElement('button'); b.className='card putdown';
@@ -3220,13 +3331,13 @@ function renderShopConsumableCards(){
       S.hero.consumables.splice(i,1);
       say(`you set aside the ${c.name.toLowerCase()}.`);
       showNpcPortrait('merch_idle'); typeLine('“Suit yourself.”');
-      updateHud(); renderSlotBar(); renderShopConsumableCards();
+      updateHud(); renderSlotBar(); renderConsumableManageCards();
     };
     cards.appendChild(b);
   });
   const back=document.createElement('button'); back.className='card';
-  back.innerHTML=`<div class="cat">BACK</div><div class="nm">Step back</div><div class="ds">See what else he has.</div>`;
-  back.onclick=renderShopMenu;
+  back.innerHTML=`<div class="cat">BACK</div><div class="nm">Step back</div><div class="ds">Back to the supply stall.</div>`;
+  back.onclick=renderShopConsumableCards;
   cards.appendChild(back);
 }
 
@@ -3477,6 +3588,17 @@ function drawScene(){
   setSceneCredits(false);
   if(s){ go.style.display=''; return; }
   go.style.display='none';
+  // The scripted lines just ran out — on a floor that gates its exit on
+  // conversation, that's the actual completion moment, not the click that
+  // opened the scene. Bystanders don't count: talkToBystander leaves
+  // S.talkingKind unset, so idle chatter never satisfies this. The one
+  // exception is the Mechanic's favor pitch — picking a reward is the real
+  // ask there, so that floor completes in finishMechFavor() instead.
+  if(S.talkingKind && !S.floorTalkDone && floorNeedsTalk(FLOORS[S.floor]) &&
+     sceneEndMode!==renderFavorCards){
+    S.floorTalkDone=true;
+    if(!S.enemies.some(e=>e.alive) && S.shrines.size===0) clearFloor('talk');
+  }
   if(!sceneEndMode){                          // the beat just ends
     closeScene();
     updateHud(); return;
@@ -5202,6 +5324,7 @@ cv.addEventListener('click',ev=>{
 });
 document.getElementById('curtain').addEventListener('click',restart);
 document.getElementById('btnEnd').onclick=endTurn;
+document.getElementById('btnStatus').onclick=openStatusPanel;
 document.getElementById('btnSalvage').onclick=toggleSalvage;
 document.getElementById('btnRestart').onclick=restart;
 document.getElementById('btnRestart').innerHTML=
