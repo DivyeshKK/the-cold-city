@@ -233,10 +233,30 @@
     pointer-events:none;transition:opacity .7s ease}
   .fader.on{opacity:1;pointer-events:auto}
 
-  /* The end of the run: the room whites out, and the credits climb through it. */
+  /* The end of the run: the room whites out, a short narration reads over
+     the white, then the credits climb through it. */
   .whiteout{position:absolute;inset:0;background:#fff;opacity:0;z-index:20;
     pointer-events:none;transition:opacity 1.5s ease}
   .whiteout.on{opacity:1}
+  /* Narration read over the whiteout — dark text needs the white behind it,
+     so this sits above .whiteout in z-index rather than fighting it. Click
+     advances it, same as every other scripted-text moment in the game, so
+     .active is what turns pointer-events (and the hand cursor) on. */
+  .endCard{position:absolute;inset:0;z-index:21;display:flex;align-items:center;
+    justify-content:center;padding:15px 22px;text-align:center;pointer-events:none}
+  .endCard.active{pointer-events:auto;cursor:pointer}
+  .endLine{font-family:var(--display);font-size:17px;letter-spacing:.05em;
+    line-height:1.55;color:#0c0a10;text-transform:none;opacity:0;
+    transition:opacity .5s ease}
+  .endLine.show{opacity:1}
+  .endLine.status{font-size:20px;letter-spacing:.16em;text-transform:uppercase}
+  .endLine .tag{font-weight:600;transition:color .5s ease}
+  .endLine .tag.locked{color:#c81f2e}
+  .endLine .tag.cleared{color:#1c8a3c}
+  .endHint{position:absolute;bottom:16px;left:0;right:0;text-align:center;
+    font-size:8.5px;letter-spacing:.22em;text-transform:uppercase;
+    color:rgba(10,9,14,.55);opacity:0;transition:opacity .6s ease}
+  .endHint.show{opacity:1}
   .curtain.credits{background:#050308;z-index:30;padding:0;overflow:hidden;
     place-items:stretch;cursor:pointer}
   /* Fades up out of the whiteout rather than cutting to black under it. */
@@ -453,6 +473,10 @@
     </div>
 
     <div class="whiteout" id="whiteout"></div>
+    <div class="endCard" id="endCard">
+      <div class="endLine" id="endLine"></div>
+      <div class="endHint" id="endHint">Click to continue</div>
+    </div>
     <div class="curtain credits" id="credits">
       <div class="creditsRoll" id="creditsRoll"></div>
       <div class="creditsSkip">Click or press R to walk again</div>
@@ -3274,7 +3298,7 @@ function gameOver(){
 function win(){
   S.over='win'; S.phase='over'; updateHud();
   say('the lance goes quiet. the district exhales.');
-  rollCredits();
+  playEndSequence();
 }
 /* Placeholder billing — real names go in when the team decides the order. */
 const CREDITS=[
@@ -3290,21 +3314,64 @@ const CREDITS=[
   ['Music',                       ['Divyesh Khatri']],
   ['Feedback & Playtest',         ['Zerui Li','Xin Clare Yue','Dana Tô','Abhay Kumaran','Neela Lots','Butch Nasser']],
 ];
-/* The room whites out first, then the credits climb through the white. The
-   whiteout stays under them, so nothing cuts hard from board to black. */
-function rollCredits(){
+/* The room whites out, then three beats of narration read over the white,
+   each one advanced by a click — the same "click to continue" pattern every
+   other scripted line in the game already uses — and only then do the
+   credits climb through it. Every step re-checks S.gen so a restart
+   mid-sequence can't leave a stray line, listener, or curtain up behind it. */
+function playEndSequence(){
   const gen=S.gen;
   document.getElementById('whiteout').classList.add('on');
-  setTimeout(()=>{
-    if(gen!==S.gen) return;
-    const roll=document.getElementById('creditsRoll');
-    roll.innerHTML='<div class="title">The Cold City</div>'+
-      CREDITS.map(([role,people])=>
-        `<div class="role">${role}</div>`+
-        people.map(p=>`<div class="who">${p}</div>`).join('')).join('')+
-      '<div class="end">More chapters to come!</div>';
-    document.getElementById('credits').className='curtain credits show';
-  },1600);
+  const el=document.getElementById('endLine'), card=document.getElementById('endCard'),
+        hint=document.getElementById('endHint');
+  const showLine=(html,cls)=>{
+    el.className='endLine'+(cls?' '+cls:''); el.innerHTML=html;
+    void el.offsetWidth; el.classList.add('show'); hint.classList.add('show');
+  };
+  const hideLine=()=>{ el.classList.remove('show'); hint.classList.remove('show'); };
+
+  const beats=[
+    ()=>showLine('The Lance has been dismantled.'),
+    ()=>showLine('As the smoke dissipates, the massive door behind it begins to open.'),
+    ()=>{
+      showLine('DISTRICT 1: <span class="tag locked">LOCKED DOWN</span>','status');
+      // the colour swaps on its own, mid-beat — reads as one reveal, not a
+      // fourth click; a fresh node here would skip the transition and just
+      // snap red to green, so the word and the class change on the same span
+      setTimeout(()=>{
+        if(gen!==S.gen) return;
+        const tag=el.querySelector('.tag');
+        tag.classList.replace('locked','cleared'); tag.textContent='CLEARED';
+      },1400);
+    },
+  ];
+  let step=-1, busy=false;
+  const reveal=i=>{
+    if(gen!==S.gen || i<=step) return;   // stale gen, or already shown — ignore a duplicate call
+    if(i>=beats.length){
+      card.classList.remove('active'); card.onclick=null; hideLine();
+      setTimeout(()=>{ if(gen===S.gen) rollCredits(gen); },500);
+      return;
+    }
+    step=i; beats[i]();
+  };
+  card.onclick=()=>{
+    if(gen!==S.gen || busy) return;
+    busy=true; hideLine();
+    setTimeout(()=>{ if(gen===S.gen){ busy=false; reveal(step+1); } },350);
+  };
+  card.classList.add('active');
+  setTimeout(()=>reveal(0), 1700);       // the first line still opens on its own, once the white settles
+}
+function rollCredits(gen){
+  if(gen!==S.gen) return;
+  const roll=document.getElementById('creditsRoll');
+  roll.innerHTML='<div class="title">The Cold City</div>'+
+    CREDITS.map(([role,people])=>
+      `<div class="role">${role}</div>`+
+      people.map(p=>`<div class="who">${p}</div>`).join('')).join('')+
+    '<div class="end">More chapters to come!</div>';
+  document.getElementById('credits').className='curtain credits show';
 }
 function showCurtain(res,poem){
   const c=document.getElementById('curtain');
@@ -4677,6 +4744,11 @@ function restart(){
   document.getElementById('credits').className='curtain credits';
   document.getElementById('creditsRoll').innerHTML='';   // so the roll replays from the top
   document.getElementById('whiteout').classList.remove('on');
+  const endLine=document.getElementById('endLine');
+  endLine.className='endLine'; endLine.innerHTML='';     // so the ending replays from the top
+  document.getElementById('endHint').classList.remove('show');
+  const endCard=document.getElementById('endCard');
+  endCard.classList.remove('active'); endCard.onclick=null;
   loadFloor(0);
 }
 document.getElementById('credits').addEventListener('click',restart);
