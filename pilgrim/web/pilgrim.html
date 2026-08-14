@@ -231,7 +231,8 @@
      ready the moment Play is pressed — which means every piece of game chrome
      has to be hidden until then, or it shows through the gradient. */
   .wrap.titling .hud, .wrap.titling #bubbles, .wrap.titling .slotBar,
-  .wrap.titling .bar, .wrap.titling details, .wrap.titling .titlebar{display:none}
+  .wrap.titling .bar, .wrap.titling details, .wrap.titling .titlebar,
+  .wrap.titling .guideCallout{display:none}
   /* The title owns the whole page. The stage breaks out of its phone-shaped
      frame and the skyline is scaled to COVER the viewport (cropping the
      overflow) rather than fit inside it, so there are no bars down the
@@ -305,7 +306,10 @@
     text-transform:uppercase;color:rgba(255,255,255,.45)}
 
   /* the black the run fades through on its way in */
-  .fader{position:absolute;inset:0;background:#000;opacity:0;z-index:50;
+  /* position:fixed, not absolute — it now lives outside #stage specifically
+     so its coverage is never at the mercy of that element's own transform
+     scale, which changes mid-transition (see the HTML comment by #fader). */
+  .fader{position:fixed;inset:0;background:#000;opacity:0;z-index:50;
     pointer-events:none;transition:opacity .7s ease}
   .fader.on{opacity:1;pointer-events:auto}
 
@@ -578,8 +582,25 @@
   summary::-webkit-details-marker{display:none}
   summary:before{content:"› ";color:var(--cyan)}
   details[open] summary:before{content:"⌄ "}
+  /* Points at Game Guide until it's actually been opened once — non-blocking,
+     never forces the panel, just a highlight and a small callout sitting
+     beside it. Both disappear together, for the rest of that run, the
+     moment #gameGuide fires a real 'toggle' to open. */
+  #gameGuide.nag summary{animation:guideGlow 1.8s ease-in-out infinite}
+  @keyframes guideGlow{
+    0%,100%{box-shadow:0 0 0 0 rgba(84,219,214,.55)}
+    50%    {box-shadow:0 0 0 5px rgba(84,219,214,0)}
+  }
+  .guideCallout{margin-top:12px;padding:8px 12px;font-size:10.5px;line-height:1.6;
+    color:var(--dim);letter-spacing:.02em;
+    border:1px solid rgba(84,219,214,.35);background:rgba(84,219,214,.06)}
+  .guideCallout b{color:var(--cyan);letter-spacing:.08em}
+  .guideCallout .arrow{display:inline-block;color:var(--cyan);
+    animation:bobTri 1.1s ease-in-out infinite}
   .rules{padding:0 15px 15px;font-size:12.5px;line-height:1.85;color:var(--dim)}
   .rules b{color:var(--ink)} .rules .k{color:var(--cyan)} .rules .h{color:var(--magenta)}
+  .rules .guideTitle{display:block;font-size:13.5px;letter-spacing:.06em;color:var(--gold)}
+  .rules .locked{color:var(--faint);font-style:italic}
   .rules code{background:rgba(84,219,214,.07);padding:1px 5px;color:var(--gold);
     font-size:10px;border:1px solid rgba(84,219,214,.12)}
   .rules table{width:100%;border-collapse:collapse;margin:8px 0;font-size:9.5px}
@@ -597,6 +618,10 @@
     .slotBar{margin-top:8px}
     .bar{margin-top:8px}
     details{display:none}
+    /* The callout points at Game Guide's summary — hidden right above this
+       rule. Left showing on its own, it floated with nothing to point at,
+       reading as a stray, disconnected block under the real controls. */
+    .guideCallout{display:none}
   }
 </style>
 
@@ -706,9 +731,20 @@
     <div class="curtain titleCredits versions" id="titleVersions">
       <div class="tcRoll" id="tvRoll"></div>
     </div>
-    <div class="fader" id="fader"></div>
   </div>
   </div>
+
+  <!-- Lives outside #stage on purpose. #stage is transform:scale()'d (full-
+       bleed during titling, framed board after), and a CSS transform on an
+       ancestor becomes the containing block for its descendants — so a
+       fader nested inside it was covering #stage's OWN shrinking box, not
+       the viewport. The instant fitStage() snapped the scale back down
+       (the same tick the fade was supposed to be holding solid black), the
+       fader's coverage shrank with it, leaving a sliver of the old
+       full-bleed title visible through the gap: the "ghosted" flash. A
+       plain fixed-viewport fader outside the transformed subtree can't
+       shrink out from under itself, no matter when the stage resizes. -->
+  <div class="fader" id="fader"></div>
 
   <div class="slotBarWrap" id="slotBarWrap">
     <div class="slotBar" id="slotBar"></div>
@@ -726,9 +762,14 @@
     </div>
   </div>
 
-  <details>
-    <summary>Rules, stats &amp; the damage formula</summary>
+  <div class="guideCallout" id="guideCallout">
+    <span class="arrow">↓</span> Need help? Open <b>GAME GUIDE</b> to review rules, controls,
+    stats, and information about enemies you've encountered.
+  </div>
+  <details id="gameGuide" class="nag">
+    <summary>Game Guide</summary>
     <div class="rules">
+      <b class="guideTitle">Game Guide — Stats, Combat, Skills &amp; Enemies</b><br><br>
       <b>Base stats</b> — basic damage <code>4</code> · basic defense <code>1</code> ·
       HP <code>10</code> · MP <code>4</code> · move <code>1</code> · attack distance <code>1</code>.<br><br>
       <b>Damage formula</b><br>
@@ -750,11 +791,9 @@
       <b>Skills</b> — clear a floor, choose <b>1 of 3</b>. You may carry <b>5</b>;
       at five you must replace one. Most are <b>passive</b> (permanent); a few are
       <span style="color:var(--purple)">active</span> and cost magic to use.<br><br>
-      <b>The enemies</b><br>
-      <span class="h">Goon</span> — melee. Takes the closest path to you, strikes when adjacent.<br>
-      <span class="h">Sniper</span> — ranged. Kites away and fires when you are outside its 5×5 watch with a clear line. Walls block it.<br>
-      <span class="h">Mortar</span> — artillery. Shells the tile where you last stood; its damage ignores half your defense. <b>Step each turn to dodge it.</b><br>
-      <span class="h">Warden</span> (boss) — heavy armor (defense 3). Physical blows glance off; <b>magic and multi-hit</b> are the answers.<br><br>
+      <b>Enemies</b> — described here as you meet them; nothing you haven't
+      encountered yet is spoiled.<br>
+      <div id="rulesEnemies"></div><br>
       <b>Controls</b> — click a tile to step, click a foe to strike ·
       <span class="k">WASD/Arrows</span> step · <span class="k">Space</span> end turn ·
       <span class="k">R</span> restart.
@@ -1012,8 +1051,12 @@ const SKILLS={
     ds:'Strike from 3 tiles away. Half damage past the first tile.',mod:{range:2},grants:'ranged'},
   magic_staff:{cat:'GEAR',name:'Magic Staff',kind:'passive',
     ds:'+1 range. Spells cost 1 less.',mod:{range:1,mpCut:1},grants:'ranged'},
+  // Used to be a flat +1 defense — a strictly smaller Shield Block with
+  // nothing else going for it. This trades some of that mitigation for a
+  // bigger buffer instead, so the choice is breadth (survive more total
+  // damage) against Shield Block's depth (blunt every single hit harder).
   armor:{cat:'GEAR',name:'Armor',kind:'passive',
-    ds:'Take 1 less damage per hit.',mod:{def:1}},
+    ds:'Take 1 less damage per hit, and +1 max HP.',mod:{def:1,hp:1}},
   knight_armor:{cat:'GEAR',name:'Knight Armor',kind:'passive',
     ds:'+2 max HP.',mod:{hp:2}},
 
@@ -1045,7 +1088,13 @@ const POOLS={
             'magic_barrier','bow','magic_staff','armor',
             'knight_armor','magic_heart','vitality'],
 };
-POOLS.all = [...POOLS.basic,...POOLS.actives1,...POOLS.actives2,...POOLS.passive];
+// `basic` stays out of `all` on purpose: Sharpen and Harden are flat, no-cost
+// versions of Power Strike and Knight Armor/Vitality, so drawing from the
+// same pool made them a strictly worse copy of a card already in the game
+// rather than a real choice. Keeping them to the early narrow-pool floors
+// gives them their own lane instead — the simple pick before the better
+// version exists — rather than a trap later.
+POOLS.all = [...POOLS.actives1,...POOLS.actives2,...POOLS.passive];
 /* The Mechanic's favor draws from its own small pool — never offered anywhere
    else, so meeting him is the only way to learn one of these. */
 POOLS.mechanic = ['return_fire','mech_whirlwind','incendiary_shot'];
@@ -1402,6 +1451,78 @@ const KINDS={
 /* Credits dropped per kill — a small random range per enemy type, bosses drop none. */
 const CREDIT_DROPS={ goon:[1,2], sniper:[2,3], mortar:[3,4] };
 const randInt=(lo,hi)=>lo+Math.floor(Math.random()*(hi-lo+1));
+
+/* ---- Game Guide entries — one per KINDS entry, written for the panel, not
+   the code. Damage/range/movement/wall-blocking are called out explicitly
+   because that's what the shape of a fight actually turns on; values match
+   KINDS and each kind's Act function exactly, so a balance pass here means a
+   pass there too. Only shown once S.seenKinds has the kind in it. */
+const ENEMY_INFO={
+  goon:{order:0,html:
+    `<span class="h">Goon</span> — melee, <span class="k">${KINDS.goon.bd} damage</span> (+1 for every 3 floors deep it appears). `+
+    `<b>Range:</b> adjacent tiles only. <b>Moves:</b> paths the shortest route to you, 1 tile a turn. `+
+    `<b>Walls:</b> block its route — it has to go around them. No special tricks.`},
+  sniper:{order:1,html:
+    `<span class="h">Sniper</span> — ranged, <span class="k">${KINDS.sniper.bd} damage</span> (+1 for every 3 floors deep it appears). `+
+    `<b>Range:</b> only fires from 3+ tiles away, and only with a clear line to you. `+
+    `<b>Moves:</b> gives 1 tile of ground when you close within 3 — never two turns running. `+
+    `<b>Special:</b> reloads for a full turn after every shot, so it can never fire twice in a row. `+
+    `<b>Walls:</b> block its shot outright — step behind one and it can't hit you.`},
+  mortar:{order:2,html:
+    `<span class="h">Mortar</span> — artillery, <span class="k">${KINDS.mortar.bd} magic damage</span> (+1 for every 3 floors deep it appears; magic ignores half your defense). `+
+    `<b>Telegraph:</b> marks the single tile you're standing on the moment it takes aim — or, if another mortar already marked your tile, a free tile from the ring around you instead, so two warnings never hide on top of each other. `+
+    `<b>Fires:</b> the following round, not immediately — whoever is still on that exact marked tile takes the hit; empty ground just craters. `+
+    `<b>Moves:</b> never. <b>Avoid it:</b> step off the marked tile any time before its next turn. `+
+    `<b>Walls:</b> irrelevant — it's aiming at a remembered tile, not a sightline, so cover doesn't stop it.`},
+  warden:{order:3,html:
+    `<span class="h">Warden</span> (boss) — <span class="k">${KINDS.warden.bd} damage</span> physical, fixed. `+
+    `<b>Range:</b> melee at adjacent tiles; beyond 3 tiles with a clear line it hurls its blade for the same damage instead — `+
+    `one throw, then it must close the distance again before it can throw a second time. `+
+    `<b>Moves:</b> closes 2 tiles a turn — faster than a Goon, so backing away alone doesn't hold it off. `+
+    `<b>Special:</b> defense ${KINDS.warden.def}, the heaviest armor in the game — magic and multi-hit attacks cut through it far better than plain strikes. `+
+    `<b>Walls:</b> block the blade-hurl's line of sight.`},
+  agent180:{order:4,html:
+    `<span class="h">Agent 180</span> (boss) — <span class="k">${KINDS.agent180.bd} damage</span> physical, fixed. `+
+    `<b>Normal shot:</b> fires beyond 1 tile with a clear line, then reloads for a turn before it can fire again, same as a Sniper. `+
+    `<b>Telegraph:</b> every 3rd round it blinks onto a row with no walls in it and lights the entire row instead of taking a normal shot. `+
+    `<b>Fires:</b> the following round — anyone anywhere along that lit row is hit, not just the tile it marked when lighting it; a row with nobody on it does nothing. `+
+    `<b>Avoid it:</b> the moment a row lights up, move off that row (any other row is safe) before its next turn. `+
+    `<b>Moves:</b> otherwise always retreats — 1 tile most turns, 2 tiles every other turn. `+
+    `<b>Special:</b> any hit that doesn't kill it teleports it elsewhere in the room. `+
+    `Fought in the dark — while it's alive, your own attack range is capped to the lit 5×5 patch around you. `+
+    `<b>Walls:</b> a walled row can never be the one it lights, but once a row is chosen nothing on it blocks the beam.`},
+  lance:{order:5,html:
+    `<span class="h">The Lance</span> (boss, final) — magic, fixed defense ${KINDS.lance.def}. `+
+    `<b>Damage cap:</b> no single hit you land on it can ever exceed 9, however strong the attack — it has to be worn down, not burst. `+
+    `<b>Range/targeting:</b> a fixed 2×2 monument that never moves. Each cycle it marks a wide swath of the room `+
+    `(your row plus a scatter — 12 tiles at first, 24 tiles after its first bar breaks) one turn ahead, `+
+    `then burns every marked tile — anyone caught takes a magic hit, is thrown clear, and the ground stays sealed for 2 turns. `+
+    `<b>Special:</b> two phases. Emptying its first 34 HP doesn't kill it — health refills to 3× (102), `+
+    `2 fresh Goons and 2 fresh Mortars join the fight, a shockwave throws you to the back of the room, `+
+    `and roughly half the cover is destroyed or set burning. `+
+    `<b>Walls:</b> irrelevant to its attack (it marks tiles, not sightlines) — though Phase 2's shockwave wrecks half of them anyway.`},
+};
+function renderRulesEnemies(){
+  const el=document.getElementById('rulesEnemies'); if(!el) return;
+  const seen=(S&&S.seenKinds)||new Set();
+  const rows=Object.keys(ENEMY_INFO)
+    .filter(k=>seen.has(k))
+    .sort((a,b)=>ENEMY_INFO[a].order-ENEMY_INFO[b].order)
+    .map(k=>`<div style="margin-bottom:8px">${ENEMY_INFO[k].html}</div>`);
+  el.innerHTML = rows.length ? rows.join('')
+    : '<span class="locked">None encountered yet — enemies you\'ve met will be described here.</span>';
+}
+/* The pulse + callout point at Game Guide from the moment a run starts —
+   nothing gates it to a floor, so it's already up through the movement
+   tutorial and the first fight, not just after them. Opening the panel for
+   real (a genuine 'toggle' to open, not this function running) is the only
+   thing that ever turns it off, and it stays off for the rest of that run. */
+function updateGuideNag(){
+  const show=!(S&&S.guideOpened);
+  const cs=document.getElementById('guideCallout').style;
+  cs.display = show?'':'none';
+  document.getElementById('gameGuide').classList.toggle('nag',show);
+}
 
 /* ============================ FLOORS ============================
    One new enemy type per floor; combinations only reuse known types.
@@ -1958,7 +2079,8 @@ function newRun(){
     log:[], round:1, phase:'player', over:null,
     enemies:[], walls:new Set(), wallDeco:new Map(), shrines:new Set(), npcs:[], decor:[],
     reach:new Map(), attackable:new Set(), gen:0, walking:false, mechFavorDone:false, talkingKind:null,
-    scorched:new Map(), goal:null, exitOpen:false, exitAnim:null, exitPending:false };
+    scorched:new Map(), goal:null, exitOpen:false, exitAnim:null, exitPending:false,
+    seenKinds:new Set(), guideOpened:false };
 }
 
 /* --------- derived hero stats (base + skill mods) --------- */
@@ -2102,6 +2224,9 @@ function loadFloor(i){
             range:K.range,move:K.move,dtype:K.dtype,ai:K.ai,boss:!!K.boss,
             alive:true,poison:0,burn:0,vuln:0,anim:null,flash:0,n};
   });
+  // Once a kind's actually on the board, the Game Guide is allowed to talk
+  // about it — never before, so nothing there spoils what's still ahead.
+  for(const e of S.enemies) S.seenKinds.add(e.kind);
   const h=S.hero;
   S.gen++; S.resolving=false; S.walking=false;  // drop any in-flight turn or walk
   h.col=GEN_START_COL; h.row=GEN_START_ROW;     // don't slide in from the last floor
@@ -5874,6 +5999,7 @@ function restart(){
   endCard.classList.remove('active'); endCard.onclick=null;
   document.getElementById('bossTitle').classList.remove('play');
   selectedItem=null; tutClickTarget=null;
+  updateGuideNag();
   loadFloor(0);
 }
 /* Out of the credits and back to the title, rather than straight into another
@@ -5952,6 +6078,16 @@ document.getElementById('btnVersions').addEventListener('click',()=>{
   elTitleVersions.className='curtain titleCredits versions show';
 });
 elTitleVersions.addEventListener('click',()=>{ elTitleVersions.className='curtain titleCredits versions'; });
+
+// refreshed on open rather than kept live, since it only matters while
+// actually being read and nothing forces it shut mid-run
+const elGameGuide=document.getElementById('gameGuide');
+elGameGuide.addEventListener('toggle',()=>{
+  if(!elGameGuide.open) return;
+  renderRulesEnemies();
+  // a real open, not the highlight's own re-render — the nag is done for the run
+  if(S && !S.guideOpened){ S.guideOpened=true; updateGuideNag(); }
+});
 
 restart();                                       // loadFloor(0) builds the background and particles itself
 buildTitleCity();
