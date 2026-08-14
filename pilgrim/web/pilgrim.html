@@ -59,8 +59,14 @@
      the board is sized for a viewport taller than the one it's in, and the
      bottom row falls off the screen. It stays a constant on purpose: the slot
      squares are sized from it and are square, so measuring it at runtime
-     would feed straight back into itself. */
-  :root{--chrome:245px}
+     would feed straight back into itself.
+     Bumped 245->350: the Game Guide row and its one-time callout both landed
+     under here later without this ever being re-tuned, so anything around a
+     768px-tall window (the most common laptop height) grew a vertical
+     scrollbar and the whole panel shifted while it filled in. 350 is the
+     smallest value that stays scrollbar-free there, verified by measuring
+     document.documentElement.scrollHeight against the viewport directly. */
+  :root{--chrome:350px}
   .stageWrap{position:relative;margin:0 auto;aspect-ratio:180/320;
     width:min(100%, 405px, calc((100dvh - var(--chrome)) * 0.5));
     border:1px solid var(--edge);background:#080410;overflow:hidden;
@@ -232,7 +238,7 @@
      has to be hidden until then, or it shows through the gradient. */
   .wrap.titling .hud, .wrap.titling #bubbles, .wrap.titling .slotBar,
   .wrap.titling .bar, .wrap.titling details, .wrap.titling .titlebar,
-  .wrap.titling .guideCallout{display:none}
+  .wrap.titling .guideCallout, .wrap.titling .playSide{display:none}
   /* The title owns the whole page. The stage breaks out of its phone-shaped
      frame and the skyline is scaled to COVER the viewport (cropping the
      overflow) rather than fit inside it, so there are no bars down the
@@ -259,6 +265,15 @@
   .curtain.title{z-index:24;backdrop-filter:none;padding:0;
     background:linear-gradient(180deg,rgba(6,3,14,.86) 0%,rgba(6,3,14,.4) 30%,
       rgba(6,3,14,.32) 52%,rgba(6,3,14,.62) 82%,rgba(6,3,14,.92) 100%)}
+  /* Both of these are clicked repeatedly and neither holds text worth
+     copying, so the browser's own feedback only gets in the way: a blue
+     tap-highlight box on the press, and a blue selection smear when a
+     second click lands fast enough to count as a double-click. */
+  .curtain.title, .curtain.title *,
+  .opening, .opening *{
+    -webkit-tap-highlight-color:transparent;
+    user-select:none;-webkit-user-select:none}
+  .curtain.title ::selection, .opening ::selection{background:transparent}
   .titleInner{text-align:center;padding:0 18px}
   .titleName{display:inline-block;font-family:var(--display);font-size:42px;
     letter-spacing:.16em;text-transform:uppercase;color:var(--ink);line-height:1.15;
@@ -505,6 +520,11 @@
   button.skip:hover{border-color:var(--cyan);color:#fff}
 
   .bar{display:flex;flex-direction:column;gap:8px;align-items:center;margin-top:12px}
+  /* Stacked by default — .play is transparent to layout and everything falls
+     down the page in source order, exactly as it did before the split. The
+     landscape rule further down is the only thing that turns it into a row. */
+  .play{display:block}
+  .playSide{display:block}
   /* The four run buttons sit as one block the width of the board, rather than
      drifting to opposite ends of the page — the slot bar above them is the
      same width, so the whole lower half reads as one panel. */
@@ -523,11 +543,14 @@
   button:disabled{opacity:.3;cursor:not-allowed}
   .spacer{flex:1}
 
-  /* the game is waiting on you: an attack offer announces itself */
-  .strikeRow{display:flex;gap:8px}
+  /* the game is waiting on you: an attack offer announces itself. Reserved
+     at a constant height whether it holds zero or several targets, so the
+     button grid below doesn't jump every time a strike becomes offered. */
+  .strikeRow{display:flex;gap:8px;justify-content:center;min-height:36px}
   button.strike{color:#fff;border-color:rgba(255,92,106,.65);
     background:linear-gradient(180deg,rgba(255,92,106,.22),rgba(255,92,106,.08));
-    animation:await 1.15s ease-in-out infinite}
+    animation:await 1.15s ease-in-out infinite;
+    height:36px;padding:0 14px;display:flex;align-items:center;justify-content:center}
   button.strike:hover{background:rgba(255,92,106,.3);border-color:var(--danger)}
   @keyframes await{
     0%,100%{box-shadow:0 0 0 0 rgba(255,92,106,.45)}
@@ -576,7 +599,11 @@
   #btnSalvage:hover:not(:disabled){border-color:var(--danger);
     background:rgba(255,92,106,.3);color:#fff}
 
-  details{margin-top:12px;border:1px solid var(--edge);background:rgba(22,13,36,.4)}
+  /* Matches the slot bar and button grid above it exactly, rather than
+     stretching to the page's wider max-width — otherwise it reads as a
+     different panel instead of the last row of the same control block. */
+  details{margin:12px auto 0;border:1px solid var(--edge);background:rgba(22,13,36,.4);
+    width:min(100%, 405px, calc((100dvh - var(--chrome)) * 0.5))}
   summary{cursor:pointer;font-size:10px;letter-spacing:.18em;text-transform:uppercase;
     color:var(--dim);padding:10px 13px;list-style:none}
   summary::-webkit-details-marker{display:none}
@@ -608,20 +635,103 @@
   .rules th{color:var(--faint);text-transform:uppercase;letter-spacing:.12em;font-size:8.5px}
   .scroll{overflow-x:auto}
 
+  /* ---- the opening cutscene ----
+     Black, full-window, above every other layer. Text only: lines stack up
+     inside a page, then the whole page fades out and the next one comes up. */
+  .opening{position:fixed;inset:0;z-index:60;background:#000;display:none;
+    align-items:center;justify-content:center;cursor:pointer;overflow:hidden}
+  .opening.show{display:flex}
+  .openLines{position:relative;z-index:2;text-align:center;padding:0 22px;
+    font-family:var(--display);font-size:clamp(18px,4.4vw,28px);
+    letter-spacing:.10em;line-height:1.9;color:#fff;
+    opacity:1;transition:opacity 1s ease}
+  .openLines.out{opacity:0}               /* the click takes the page away */
+  .openLines div{opacity:0;transition:opacity 1.1s ease}
+  .openLines div.in{opacity:1}
+  .openLines .grn{color:#3fe07a}
+  .openLines .pur{color:#c08cff}
+  /* "sealed" holds white for a second, drops a frame, and comes back red.
+     Two steps rather than a strobe — it should read as a fault, not a flash. */
+  .openLines .seal{display:inline-block;animation:sealGlitch .34s steps(1) 1s 1 both}
+  @keyframes sealGlitch{
+    0%  {color:#fff;      transform:translate(0,0)}
+    35% {color:#8a1520;   transform:translate(-2px,1px)}
+    70% {color:#ff3b46;   transform:translate(2px,-1px)}
+    100%{color:#ff3b46;   transform:translate(0,0)}
+  }
+  .openSkip{position:absolute;bottom:18px;left:0;right:0;text-align:center;
+    font-size:9px;letter-spacing:.22em;text-transform:uppercase;
+    color:rgba(255,255,255,.35);z-index:3}
+
   /* Phones and short windows: strip the page furniture so the board itself
-     keeps as much of the viewport as possible. --chrome drops to match. */
+     keeps as much of the viewport as possible. --chrome drops to match.
+     Game Guide's closed <summary> row (~35px) stays — it's the only way
+     to reach combat rules and the enemy bestiary on a phone, so hiding it
+     entirely (as this rule used to) leaves mobile players with no way to
+     open it at all. */
   @media (max-height:760px), (max-width:560px){
-    :root{--chrome:199px}
+    :root{--chrome:234px}
     .wrap{padding:8px 8px 12px}
     .titlebar{margin-bottom:6px}
     .titlebar h1{font-size:17px;letter-spacing:.18em}
     .slotBar{margin-top:8px}
     .bar{margin-top:8px}
-    details{display:none}
-    /* The callout points at Game Guide's summary — hidden right above this
-       rule. Left showing on its own, it floated with nothing to point at,
-       reading as a stray, disconnected block under the real controls. */
+    details{margin-top:8px}
+    /* The callout points at Game Guide's summary, which is visible again
+       above this rule, but the callout's own multi-line block still costs
+       more space than a phone screen should spend — the pulsing summary
+       (#gameGuide.nag) carries the same "look here" signal on its own. */
     .guideCallout{display:none}
+  }
+
+  /* ---- wide windows: the controls move beside the board ----
+     A landscape window is short and wide, which is the worst case for a
+     column layout — the board is squeezed by the height the controls eat,
+     while the width sits unused. So put the controls in a side column and
+     let the board have the height back.
+
+     Gated on WIDTH ALONE, deliberately, not on orientation. A window can be
+     portrait by the strict h>w test and still be far wider than the board
+     needs — 900x1000, say — and an orientation test would stack those and
+     waste the same space this rule exists to reclaim. "Do they fit beside
+     it" is a question about width, so that is what gets asked. 740 is the
+     board at its 405 cap, plus the widest the column gets, plus the gap and
+     the wrap's padding. Below it the query stops matching and everything
+     falls back down the page on its own — the stacked layout is the default,
+     not a second copy of the rules.
+
+     --chrome drops to 150 because in this mode only the titlebar, the slot
+     bar and the strike row are above and below the board; the button grid
+     and Game Guide have left the column entirely. That is what lets the
+     board grow into a short landscape window instead of staying letterboxed
+     at the portrait size. Verified against documentElement.scrollHeight at
+     900x520, 1024x600, 1280x720 and 1440x900. */
+  @media (min-width:740px){
+    :root{--chrome:100px}
+    .wrap{padding:12px 16px 16px}
+    .titlebar{margin-bottom:6px}
+    .titlebar h1{font-size:19px;letter-spacing:.18em}
+    .bar{margin-top:8px}
+    .play{display:flex;align-items:flex-start;justify-content:center;gap:20px}
+    /* The board sizes itself with min(100%, ...), and as a bare flex item its
+       100% resolved against a column that had shrunk to fit the board — each
+       waiting on the other, which bottomed out at a 106px board. Give the
+       column the board's own height-derived width as its flex-basis so the
+       100% has something real underneath it; shrink stays enabled so a narrow
+       landscape window still squeezes it rather than overflowing. */
+    .playMain{flex:0 1 min(405px, calc((100dvh - var(--chrome)) * 0.5));min-width:0}
+    .playSide{flex:0 0 clamp(230px,24vw,290px);
+      display:flex;flex-direction:column;gap:10px;
+      /* line the controls up with the top of the board, not the page */
+      margin-top:0}
+    /* In the column these matched the board's width formula so the lower half
+       read as one panel. Beside it they simply fill their own column. */
+    .playSide .btnGrid{width:100%;margin:0}
+    .playSide details{width:100%;margin:0}
+    .playSide .guideCallout{margin:0}
+    /* the guide can get long — keep it inside the window rather than pushing
+       the page taller than the board it sits next to */
+    .playSide .rules{max-height:calc(100dvh - 260px);overflow-y:auto}
   }
 </style>
 
@@ -629,6 +739,12 @@
   <div class="titlebar">
     <h1>The Cold City</h1>
   </div>
+
+  <!-- Board and controls. Stacked by default; side by side once a landscape
+       window is wide enough to seat the controls beside the board (see the
+       .play flex rules). -->
+  <div class="play" id="play">
+  <div class="playMain">
 
   <div class="stageWrap" id="stageWrap">
   <div class="stage" id="stage">
@@ -746,6 +862,13 @@
        shrink out from under itself, no matter when the stage resizes. -->
   <div class="fader" id="fader"></div>
 
+  <!-- The opening. Sits outside .stageWrap so it owns the whole window
+       rather than the board's little frame. -->
+  <div class="opening" id="opening">
+    <div class="openLines" id="openLines"></div>
+    <div class="openSkip" id="openSkip">Click to continue</div>
+  </div>
+
   <div class="slotBarWrap" id="slotBarWrap">
     <div class="slotBar" id="slotBar"></div>
     <div class="bubble dock" id="itemBubble" style="display:none"></div>
@@ -754,6 +877,12 @@
 
   <div class="bar">
     <span id="strikeBtns" class="strikeRow"></span>
+  </div>
+
+  </div><!-- /.playMain -->
+
+  <!-- The run controls. Under the board in portrait, beside it in landscape. -->
+  <div class="playSide">
     <div class="btnGrid">
       <button id="btnEnd">End Turn ␣</button>
       <button id="btnStatus" title="View your equipment and passive skills">Loadout</button>
@@ -761,7 +890,6 @@
       <button id="btnRestart">Restart Run</button>
       <button id="btnMute" title="Mute the score (M)">♪ Sound</button>
     </div>
-  </div>
 
   <div class="guideCallout" id="guideCallout">
     <span class="arrow">↓</span> Need help? Open <b>GAME GUIDE</b> to review rules, controls,
@@ -800,6 +928,8 @@
       <span class="k">R</span> restart.
     </div>
   </details>
+  </div><!-- /.playSide -->
+  </div><!-- /.play -->
 </div>
 
 <script>
@@ -1485,11 +1615,11 @@ const ENEMY_INFO={
   agent180:{order:4,html:
     `<span class="h">Agent 180</span> (boss) — <span class="k">${KINDS.agent180.bd} damage</span> physical, fixed. `+
     `<b>Normal shot:</b> fires beyond 1 tile with a clear line, then reloads for a turn before it can fire again, same as a Sniper. `+
-    `<b>Telegraph:</b> every 3rd round it blinks onto a row with no walls in it and lights the entire row instead of taking a normal shot. `+
+    `<b>Telegraph:</b> every 3rd round it lights up the whole of the nearest row with no walls in it, instead of taking a normal shot, and walks onto that row a tile at a time. `+
     `<b>Fires:</b> the following round — anyone anywhere along that lit row is hit, not just the tile it marked when lighting it; a row with nobody on it does nothing. `+
     `<b>Avoid it:</b> the moment a row lights up, move off that row (any other row is safe) before its next turn. `+
     `<b>Moves:</b> otherwise always retreats — 1 tile most turns, 2 tiles every other turn. `+
-    `<b>Special:</b> any hit that doesn't kill it teleports it elsewhere in the room. `+
+    `<b>Special:</b> any hit that doesn't kill it teleports it elsewhere in the room — the only time it moves without walking. `+
     `Fought in the dark — while it's alive, your own attack range is capped to the lit 5×5 patch around you. `+
     `<b>Walls:</b> a walled row can never be the one it lights, but once a row is chosen nothing on it blocks the beam.`},
   lance:{order:5,html:
@@ -2174,9 +2304,13 @@ function heroProfile(type){
            amp  : 1,
            type : magic?'magic':'physical' };
 }
-function heroDamageTo(e,type){
+function heroDamageTo(e,type,dist=0){
   const p=heroProfile(type);
-  return calcDamage({...p, def:e.def, vuln:e.vuln||0});
+  // Mirrors playerStrike's own rangePenalty: an arrow loosed from more than
+  // a tile off lands soft. Without this the hover preview showed full
+  // point-blank damage even for a hit that would actually land at half.
+  const rangePenalty = (type!=='magic' && dist>1) ? 0.5 : 1;
+  return calcDamage({...p, def:e.def, vuln:e.vuln||0, amp:p.amp*rangePenalty});
 }
 
 /* ============================ FLOOR SETUP ============================ */
@@ -2856,32 +2990,66 @@ function stepAwayFrom(e,h){
    only see two tiles, this is the one attack you can see coming — and the
    lit row is also the only time you're told where it is standing. */
 function agent180Line(e){
-  const h=S.hero;
-  // fire down its own row if that row is clear of walls; otherwise take one
+  // fire down its own row if that row is clear of walls; otherwise take the
+  // NEAREST clear one. It has to walk there now, so a random row across the
+  // arena would be a march rather than a reposition.
   const rowClear=r=>{ for(let c=0;c<COLS;c++) if(isWall(c,r)) return false; return true; };
   let r = rowClear(e.row) ? e.row : null;
   if(r===null){
-    const open=[]; for(let rr=0;rr<ROWS;rr++) if(rowClear(rr)) open.push(rr);
-    if(!open.length) return false;
-    r = open[Math.floor(Math.random()*open.length)];
+    let bd=Infinity;
+    for(let rr=0;rr<ROWS;rr++){
+      if(!rowClear(rr)) continue;
+      const d=Math.abs(rr-e.row);
+      if(d<bd){ bd=d; r=rr; }
+    }
+    if(r===null) return false;
   }
-  // stand on the row it is about to rake, so the shot has a visible source
-  const spots=[];
-  for(let c=0;c<COLS;c++) if(!isWall(c,r)&&!occupied(c,r,e)) spots.push(c);
-  if(spots.length){
-    let best=spots[0], bd=-1;
-    for(const c of spots){ const d=Math.abs(c-h.col); if(d>bd){ bd=d; best=c; } }
-    agent180BlinkTo(e,best,r);
+  // Stand on the row it is about to rake, so the shot has a visible source.
+  // Hold its column if that tile is free, so the walk is the short way there.
+  let tc=e.col;
+  if(isWall(tc,r)||occupied(tc,r,e)){
+    let bd=Infinity;
+    for(let c=0;c<COLS;c++){
+      if(isWall(c,r)||occupied(c,r,e)) continue;
+      const d=Math.abs(c-e.col);
+      if(d<bd){ bd=d; tc=c; }
+    }
+    if(bd===Infinity) return false;
   }
+  agent180WalkTo(e,tc,r);
   e.marks=[]; for(let c=0;c<COLS;c++) if(!isWall(c,r)) e.marks.push([c,r]);
   e.lineRow=r; e.phase='fire';
   say('agent 180 lights a lane. get off that row.');
   return true;
 }
-function agent180BlinkTo(e,c,r){
-  addFx({type:'ring',col:e.col,row:e.row,col2:'rgba(63,224,122,.9)',dur:340});
-  e.col=c; e.row=r; e.vx=c; e.vy=r;            // a blink, not a glide
-  addFx({type:'ring',col:c,row:r,col2:'rgba(63,224,122,.9)',dur:340});
+/* Walks it into the firing position a tile at a time rather than dropping it
+   there. In a room lit two tiles wide the steps are mostly sound and ripples
+   on the floor, which is the point: it is somewhere, and it is coming. Only a
+   landed hit still throws it across the arena — see agent180Teleport. */
+function agent180WalkTo(e,tc,tr){
+  const path=[];
+  let c=e.col, r=e.row, guard=0;
+  while((c!==tc||r!==tr) && guard++<60){
+    const dc=Math.sign(tc-c), dr=Math.sign(tr-r);
+    // close the longer axis first, and fall back to the other when blocked
+    const tries = Math.abs(tc-c)>=Math.abs(tr-r) ? [[dc,0],[0,dr]] : [[0,dr],[dc,0]];
+    let moved=false;
+    for(const [mc,mr] of tries){
+      if(!mc&&!mr) continue;
+      if(!passable(c+mc,r+mr,e)) continue;
+      c+=mc; r+=mr; path.push([c,r]); moved=true; break;
+    }
+    if(!moved) break;                          // walled in — fire from where it stands
+  }
+  if(!path.length) return;
+  let i=0;
+  (function step(){
+    if(S.over||!e.alive) return;
+    const [nc,nr]=path[i++];
+    addFx({type:'ring',col:e.col,row:e.row,col2:'rgba(63,224,122,.45)',dur:240});
+    e.col=nc; e.row=nr;                        // vx/vy left alone, so it glides
+    if(i<path.length) setTimeout(step,130);
+  })();
 }
 function agent180Act(e){
   const h=S.hero;
@@ -2907,12 +3075,11 @@ function agent180Act(e){
   for(let i=0;i<steps;i++){ if(!stepAwayFrom(e,h)) break; }
   // In a room you can only see two tiles across, a silent reposition reads as
   // the thing teleporting at random. Ring the ground it left and the ground
-  // it took, so the move is legible even when the body isn't.
+  // it took, so the move is legible even when the body isn't. It walks the
+  // gap, though — only a landed hit throws it (agent180Teleport).
   if(from[0]!==e.col||from[1]!==e.row){
     addFx({type:'ring',col:from[0],row:from[1],col2:'rgba(63,224,122,.75)',dur:420});
     addFx({type:'ring',col:e.col,   row:e.row,   col2:'rgba(63,224,122,.9)', dur:420});
-    e.vx=e.col; e.vy=e.row;                    // a blink, not a glide
-    e.blinkAt=performance.now();
   }
   if(cheb(e,h)>1 && losClear(e,h)){
     if(e.spent){ e.spent=false; return; }       // reloading — your window to close
@@ -4253,10 +4420,21 @@ function talkToNpc(npc){
 
 /* ============================ END STATES ============================ */
 function gameOver(){
+  // S.over/S.phase flip immediately — that's what halts the enemy-turn loop
+  // and any further input — but the curtain itself is display:none/grid with
+  // no fade, so showing it in the same instant as the killing blow swallowed
+  // the hit-flash, the shake, and the floating damage number before any of
+  // them had a frame to read. Freeze the run now; let the blow land first.
+  const gen=S.gen;
   S.over='loss'; S.phase='over'; updateHud();
+  // The sound goes with the BLOW, not with the curtain 650ms later — it is
+  // part of the hit landing, the same beat as the flash and the shake.
   if(SCORE) SCORE.sfx('death',0.8);
-  say('you fall. the city does not notice.');
-  showCurtain('loss','the world stays indifferent. the smog closes over a quiet shape.');
+  setTimeout(()=>{
+    if(gen!==S.gen) return;                  // a fresh run started in the meantime
+    say('you fall. the city does not notice.');
+    showCurtain('loss','the world stays indifferent. the smog closes over a quiet shape.');
+  }, 650);
 }
 function win(){
   S.over='win'; S.phase='over'; updateHud();
@@ -4272,6 +4450,36 @@ function win(){
    board turned portrait (it was 12x6 landscape before that); every build
    since is 2.x. Each entry is [number, date, [lines]] — add to the top. */
 const VERSIONS=[
+  ['2.9.0','14 Aug 2026',[
+    'On a wide screen the run buttons and the Game Guide sit beside the board instead of under it',
+    'The board grows to fill the height it gets back — full size on a tablet',
+    'Narrow the window and the controls drop back underneath, as before',
+  ]],
+  ['2.8.2','14 Aug 2026',[
+    'Agent 180 only teleports when you land a hit on it — every other move is a walk',
+    'It walks onto the row it lights a tile at a time, instead of appearing on it',
+    'The lane it picks is the nearest clear row, not one across the arena',
+  ]],
+  ['2.8.1','14 Aug 2026',[
+    'An opening: three pages of text on black before the first floor',
+    'The lines stack up two seconds apart, and a click turns the page',
+    'The word sealed holds white for a second, glitches, and comes back red',
+    'The Pilgrim lands on the first floor rather than appearing on it',
+    'No more blue flash when you click the title or the opening text',
+  ]],
+  ['2.8.0','13 Aug 2026',[
+    'The Rules panel is now the Game Guide, and it glows until you have opened it once',
+    'A bestiary that fills in as you meet them — exact damage, reach, movement and wall habits for every enemy',
+    'The Game Guide is reachable on a phone again, instead of being hidden below a certain window size',
+    'Sharpen and Harden are out of the general draft — they were only ever weaker copies of Power Strike and Knight Armor',
+    'Armor is +1 to what you shrug off and +1 health, so it trades against Shield Block instead of repeating it',
+    'No more ghost of the title screen flashing through as the game fades in',
+    'The strike row holds its height, so the buttons underneath stop jumping every time a target appears',
+    'The Game Guide lines up with the board and the buttons above it',
+    'The whole screen fits on a laptop again, with no page scrollbar mid-fight',
+    'Hovering a ranged strike shows the damage it will really do at that distance, falloff included',
+    'A killing blow gets a breath to land — the flash, shake and number read before Run Over cuts in',
+  ]],
   ['2.7.2','13 Aug 2026',[
     'A tutorial box closes on a click anywhere, not just on its little triangle',
     'The dark backdrop reaches the edges of the screen once the game starts, instead of leaving white down the sides of a wide window',
@@ -5529,7 +5737,7 @@ function drawTokens(now){
     // leak its position through the fog.)
     if(!e.boss){
       const hovered = hover && atFootprint(e,hover.col,hover.row) && S.attackable.has(e);
-      const preview = hovered? Math.max(0,e.hp-heroDamageTo(e,'physical')) : e.hp;
+      const preview = hovered? Math.max(0,e.hp-heroDamageTo(e,'physical',chebToUnit(S.hero,e))) : e.hp;
       const cxOf = (e.size||1)>1 ? pxOf(e.vx!==undefined?e.vx:e.col)+TILE/2*(e.size-1)
                                   : pxOf(e.vx!==undefined?e.vx:e.col);
       const x=cxOf-e.maxHp, y=pyOf(e.vy!==undefined?e.vy:e.row)+2;
@@ -6064,18 +6272,85 @@ elTitleName.addEventListener('click',()=>{
   elNag.classList.add('show');
   nagTimer=setTimeout(()=>elNag.classList.remove('show'),1500);
 });
-/* Play: out through black, swap the board in behind it, then back up. */
+/* ============================ THE OPENING ============================
+   Three pages of text on black. Inside a page the lines stack up two
+   seconds apart on their own; a click ends the page, fades it out, and two
+   seconds later the next one comes up. The last page hands off to floor 0.
+   Every timer lives in one list so a click can cancel the lot. */
+const OPENING_PAGES=[
+  [ 'The city is <span class="seal">sealed</span>.',
+    'The <span class="grn">TYRANT</span> has the entire city in shackles of blood and gold.',
+    'The weak starve. The strong die.' ],
+  [ 'Reach the tower. Find the <span class="grn">TYRANT</span>.',
+    'Destroy anything that gets in the way.' ],
+  [ '<span class="pur">Free</span> the city from its chains.' ],
+];
+const OPEN_LINE_GAP = 2000;   // between lines inside a page
+const OPEN_PAGE_GAP = 2000;   // from the click to the next page appearing
+let openTimers=[], openingDone=false;
+/* What a click does right now. Null while a page is fading out or the gap
+   is running, so a stray second click can't punch through to the game. */
+let openAdvance=null;
+function afterOpening(){
+  if(openingDone) return;                 // a skip and the last timer can race
+  openingDone=true;
+  openAdvance=null;
+  for(const t of openTimers) clearTimeout(t);
+  openTimers=[];
+  const box=document.getElementById('opening');
+  box.className='opening';
+  const lines=document.getElementById('openLines');
+  lines.className='openLines';
+  lines.innerHTML='';
+  titleMode=false;
+  elTitle.className='curtain title';
+  document.getElementById('wrap').classList.remove('titling');
+  fitStage();
+  restart();
+  shake(7);                               // he lands, rather than appears
+  setTimeout(()=>{ if(S&&!S.over) shake(4); },110);
+  setTimeout(()=>elFader.classList.remove('on'),80);
+}
+function playOpening(){
+  openingDone=false; openTimers=[];
+  const box=document.getElementById('opening');
+  const lines=document.getElementById('openLines');
+  const at=(ms,fn)=>{ const id=setTimeout(fn,ms); openTimers.push(id); return id; };
+  box.className='opening show';
+  document.getElementById('openSkip').textContent='click to continue';
+
+  function showPage(p){
+    lines.className='openLines';
+    lines.innerHTML=OPENING_PAGES[p].map(t=>'<div>'+t+'</div>').join('');
+    const kids=[...lines.children];
+    at(60,()=>kids[0].classList.add('in'));      // a tick, so the fade runs
+    for(let i=1;i<kids.length;i++) at(60+i*OPEN_LINE_GAP,()=>kids[i].classList.add('in'));
+    openAdvance=()=>endPage(p);
+  }
+  function endPage(p){
+    openAdvance=null;                            // deaf until the next page is up
+    for(const t of openTimers) clearTimeout(t);
+    openTimers=[];
+    lines.className='openLines out';             // everything showing fades away
+    if(p+1<OPENING_PAGES.length){ at(OPEN_PAGE_GAP,()=>showPage(p+1)); return; }
+    at(OPEN_PAGE_GAP,()=>{                       // last page: on to the road
+      elFader.classList.add('on');
+      at(700,afterOpening);
+    });
+  }
+  at(400,()=>showPage(0));
+}
+/* Play: black out, run the opening, then the road. */
 document.getElementById('btnPlay').addEventListener('click',()=>{
   if(!titleMode) return;
   elFader.classList.add('on');
-  setTimeout(()=>{
-    titleMode=false;
-    elTitle.className='curtain title';
-    document.getElementById('wrap').classList.remove('titling');
-    fitStage();                                  // back into the framed board
-    restart();                                   // floor 0, built behind the black
-    setTimeout(()=>elFader.classList.remove('on'),80);
-  },760);
+  setTimeout(()=>{ elFader.classList.remove('on'); playOpening(); },760);
+});
+document.getElementById('opening').addEventListener('click',()=>{
+  /* Only a page that's actually up answers a click. Mid-fade and in the gap
+     between pages openAdvance is null and we swallow it, so an impatient
+     double-click can't skip a page it never got to read. */
+  if(openAdvance) openAdvance();
 });
 const elTitleCredits=document.getElementById('titleCredits');
 document.getElementById('btnTitleCredits').addEventListener('click',()=>{
