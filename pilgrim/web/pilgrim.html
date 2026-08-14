@@ -265,6 +265,15 @@
   .curtain.title{z-index:24;backdrop-filter:none;padding:0;
     background:linear-gradient(180deg,rgba(6,3,14,.86) 0%,rgba(6,3,14,.4) 30%,
       rgba(6,3,14,.32) 52%,rgba(6,3,14,.62) 82%,rgba(6,3,14,.92) 100%)}
+  /* Both of these are clicked repeatedly and neither holds text worth
+     copying, so the browser's own feedback only gets in the way: a blue
+     tap-highlight box on the press, and a blue selection smear when a
+     second click lands fast enough to count as a double-click. */
+  .curtain.title, .curtain.title *,
+  .opening, .opening *{
+    -webkit-tap-highlight-color:transparent;
+    user-select:none;-webkit-user-select:none}
+  .curtain.title ::selection, .opening ::selection{background:transparent}
   .titleInner{text-align:center;padding:0 18px}
   .titleName{display:inline-block;font-family:var(--display);font-size:42px;
     letter-spacing:.16em;text-transform:uppercase;color:var(--ink);line-height:1.15;
@@ -4332,6 +4341,7 @@ const VERSIONS=[
     'The lines stack up two seconds apart, and a click turns the page',
     'The word sealed holds white for a second, glitches, and comes back red',
     'The Pilgrim lands on the first floor rather than appearing on it',
+    'No more blue flash when you click the title or the opening text',
   ]],
   ['2.8.0','13 Aug 2026',[
     'The Rules panel is now the Game Guide, and it glows until you have opened it once',
