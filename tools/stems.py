@@ -126,24 +126,31 @@ def place(buf, sig, at):
    HARMONY and ARPEGGIATION, not from adding a drum kit — the early floors stay
    percussion-free on purpose, so the first kick in the game is still the boss.
 
-   Cold voicings omit the third everywhere (fifths, fourths and ninths only),
-   so the progression moves while the world still feels unresolved. Warm
-   voicings are the same roots with the thirds and sevenths filled in."""
+   COLD vs WARM used to be "no third vs third", and omitting the third
+   everywhere is what made the early game sound eerie rather than quiet — an
+   unresolved chord reads as unease, not as indifference. Both are plain
+   consonant harmony now. The difference is DENSITY and REGISTER: cold is a
+   bare triad sitting high with no low end to lean on, warm is the same chord
+   extended (sixths, sevenths, ninths) with the bass filled in underneath.
+   Sparse and thin still feels lonely; it just no longer feels haunted.
+
+   Nothing here uses the Lydian #11 any more. B natural over F is precisely
+   the "mysterious" interval, and it was doing exactly that."""
 PROG = ['F', 'Dm', 'Bb', 'C']                       # 4 bars each
-COLD_VOICING = {                                    # no thirds anywhere
-    'F' : ['F2','C3','G3','F3'],                    # F5 add9
-    'Dm': ['D2','A2','E3','D3'],                    # D5 add9
-    'Bb': ['Bb1','F2','C3','Bb2'],                  # Bb5 add9
-    'C' : ['C2','G2','F3','D3'],                    # Csus4 add9
+COLD_VOICING = {                        # plain triads, high, no bass weight
+    'F' : ['F3','A3','C4'],
+    'Dm': ['D3','F3','A3'],
+    'Bb': ['Bb2','D3','F3'],
+    'C' : ['C3','E3','G3'],
 }
-WARM_VOICING = {
+WARM_VOICING = {                        # same chords, extended and grounded
     'F' : ['F2','A2','C3','E3','G3'],               # Fmaj9
     'Dm': ['D2','F2','A2','C3','E4'],               # Dm9
     'Bb': ['Bb1','D3','F3','A3'],                   # Bbmaj7
     'C' : ['C2','E3','G3','A3','D4'],               # C6/9
 }
-ARP_COLD = {'F':['F3','C4','G4','C4'], 'Dm':['D3','A3','E4','A3'],
-            'Bb':['Bb2','F3','C4','F3'], 'C':['C3','G3','D4','G3']}
+ARP_COLD = {'F':['F3','A3','C4','A3'], 'Dm':['D3','F3','A3','F3'],
+            'Bb':['Bb2','D3','F3','D3'], 'C':['C3','E3','G3','E3']}
 ARP_WARM = {'F':['F3','A3','C4','E4'], 'Dm':['D3','F3','A3','C4'],
             'Bb':['Bb2','D3','F3','A3'], 'C':['C3','E3','G3','A3']}
 
@@ -218,32 +225,29 @@ def write(name, sig, peak=0.7):
 # ================================================================ STEMS ====
 
 def bed_cold():
-    """Floors 0-8. Fifths, fourths and ninths — no third anywhere, so the
-       progression moves without ever resolving. Arpeggio carries the pulse."""
+    """Floors 0-8. A plain major/minor triad, voiced high with no bass under
+       it. Thin and unaccompanied rather than dissonant — the early city is
+       lonely, not haunted. Shallow LFOs: a deep wobble is itself a spooky
+       sound, and it was making the pads breathe like something alive."""
     x = np.zeros(LOOP_N)
     for i, chord in enumerate(PROG):
         pad_chord(x, COLD_VOICING[chord], i*CHORD_BEATS, CHORD_BEATS,
-                  amp=1.0, harmonics=(1.0,.30,.12,.05))
-    arpeggio(x, ARP_COLD, amp=0.34, bright=2.2, dur=1.0)
-    x += sine(hz('B4'), .030) * lfo(8, .0, 1.0, phase=.7)      # the #11 glint
-    x += sine(hz('C5'), .022) * lfo(7, .0, 1.0, phase=3.4)
-    x += noise_loop(11, 3800, hp=900) * 0.026 * lfo(2, .5, 1.0)   # tape hiss
-    x += noise_loop(12, 260) * 0.045 * lfo(3, .4, 1.0, phase=1.7)  # room rumble
+                  amp=1.0, harmonics=(1.0,.22,.07,.02))
+    arpeggio(x, ARP_COLD, amp=0.30, bright=2.6, dur=1.1)
+    x += noise_loop(11, 2600, hp=700) * 0.012 * lfo(2, .8, 1.0)   # a little air
     return x
 
 def bed_warm():
-    """Floors 9-18. Same roots and the same rhythm, so it crossfades with the
-       cold bed — but the thirds and sevenths fill in and the world stops
-       being indifferent."""
+    """Floors 9-18. Same chords and the same rhythm, so it crossfades with the
+       cold bed — but extended (sixths, sevenths, ninths) and grounded with the
+       bass filled in. Fuller, closer, kinder."""
     x = np.zeros(LOOP_N)
     for i, chord in enumerate(PROG):
         pad_chord(x, WARM_VOICING[chord], i*CHORD_BEATS, CHORD_BEATS,
-                  amp=1.0, harmonics=(1.0,.26,.10,.04))
-    arpeggio(x, ARP_WARM, amp=0.40, bright=3.0, dur=1.3)
-    x += sine(hz('C5'), .035) * lfo(9, .1, 1.0, phase=.9)
-    x += sine(hz('A4'), .040) * lfo(7, .1, 1.0, phase=2.6)
-    x += noise_loop(21, 2400, hp=500) * 0.022 * lfo(2, .6, 1.0)
-    x += noise_loop(22, 200) * 0.040 * lfo(3, .5, 1.0, phase=2.0)
+                  amp=1.0, harmonics=(1.0,.24,.09,.03))
+    arpeggio(x, ARP_WARM, amp=0.38, bright=3.2, dur=1.4)
+    x += sine(hz('A4'), .022) * lfo(4, .5, 1.0, phase=2.6)
+    x += noise_loop(21, 1800, hp=400) * 0.011 * lfo(2, .8, 1.0)
     return x
 
 def pulse():
@@ -262,17 +266,27 @@ def pulse():
     return x
 
 def tension():
-    """Low HP, or a foe adjacent. B against C — the #11 grinding on the fifth.
-       Deliberately lives ABOVE the beds: the low end is already occupied, and a
-       stem that competes for it just makes the mix muddy instead of anxious."""
-    swell = lfo(6, .10, 1.0)
-    x  = sine(hz('B4'), .55) * swell
-    x += sine(hz('C5'), .48) * lfo(6, .10, 1.0, phase=.35)     # semitone beating
-    x += sine(hz('B5'), .26) * lfo(13, .0, 1.0)
-    x += sine(hz('F5'), .20) * lfo(9, .0, 1.0, phase=1.8)      # tritone to B
-    x += sine(hz('C6'), .12) * lfo(17, .0, 1.0, phase=.6)
-    x += noise_loop(41, 11000, hp=4200) * 0.34 * lfo(6, .0, 1.0, phase=.2)
-    x += stack(hz('F2'), [.10, .03]) * lfo(3, .3, 1.0)         # just a trace of dread
+    """Low HP, or a foe adjacent.
+
+       This was a semitone beat (B against C) plus a tritone — which is not
+       "tense", it is a horror cue, and it was the single creepiest thing in
+       the score. Urgency now comes from RHYTHM: a quick sixteenth-note
+       ostinato on chord tones that quickens the pulse without ever sounding
+       wrong. Same job, no dread.
+
+       Still lives above the beds — the low end is occupied, and a stem that
+       competes for it makes the mix muddy rather than urgent."""
+    x = np.zeros(LOOP_N)
+    step = 0.25                                     # sixteenths
+    per = int(step * BEAT_N)
+    for b in range(int(BEATS / step)):
+        beat = b * step
+        chord = PROG[int(beat // CHORD_BEATS) % len(PROG)]
+        seq = ARP_WARM[chord]
+        note = seq[b % len(seq)]
+        up = hz(note) * 2                           # an octave above the bed
+        a = 0.5 if b % 4 == 0 else 0.28
+        place(x, pluck(up, 0.5, amp=a, harmonics=(1.0,.14,.05), bright=3.0), b*per)
     return x
 
 def melody():
@@ -489,11 +503,15 @@ if __name__ == '__main__':
     # it should sit at IN THE MIX, so the engine can play any combination at
     # unity without a limiter and without ducking. Beds are the foundation;
     # everything else is a layer on top and is quieter by design.
+    # Levels dropped roughly 6 dB across the board after playtest: the score
+    # plays continuously under everything, and what reads as "present" when you
+    # audition a stem on its own reads as "loud" an hour into a session. The
+    # relative balance is unchanged — every stem moved together.
     loops = [
-        ('bed_cold.wav',   bed_cold,   0.50),   ('bed_warm.wav',   bed_warm,   0.50),
-        ('pulse.wav',      pulse,      0.26),   ('tension.wav',    tension,    0.20),
-        ('melody.wav',     melody,     0.26),   ('hearth.wav',     hearth,     0.46),
-        ('boss_bed.wav',   boss_bed,   0.50),   ('boss_press.wav', boss_press, 0.24),
+        ('bed_cold.wav',   bed_cold,   0.26),   ('bed_warm.wav',   bed_warm,   0.26),
+        ('pulse.wav',      pulse,      0.15),   ('tension.wav',    tension,    0.13),
+        ('melody.wav',     melody,     0.15),   ('hearth.wav',     hearth,     0.24),
+        ('boss_bed.wav',   boss_bed,   0.28),   ('boss_press.wav', boss_press, 0.14),
     ]
     print(f'{LOOP_DUR:.3f}s  {LOOP_N} samples  {BPM:g} BPM  {BARS} bars  F major\n')
     for name, fn, pk in loops:
