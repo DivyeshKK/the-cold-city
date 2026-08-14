@@ -2419,6 +2419,7 @@ function playerStep(c,r){
   if(!S.reach.has(key(c,r))) return;
   if(c!==h.col) h.face = c<h.col ? 'left' : 'right';   // she turns as she walks
   h.col=c; h.row=r; h.moved=true;
+  if(SCORE) SCORE.sfx('step',0.5);          // quiet: this fires hundreds of times
   if(S.shrines.has(key(c,r))) takeShrine(key(c,r));
   if(S.goal && c===S.goal[0] && r===S.goal[1] && exitIsOpen()){
     addFx({type:'ring',col:c,row:r,col2:'rgba(240,201,135,.9)'});
@@ -2442,6 +2443,7 @@ function playerStrike(e,type){
     h.mp-=cost; spendUse('arcane_bolt');
   }
   h.struck=true;
+  if(SCORE) SCORE.sfx('strike', magic?0.5:0.7);
   const dist=chebToUnit(h,e);
   // an arrow loosed from more than a tile off lands soft — full force only up close
   const rangePenalty = (!magic && dist>1) ? 0.5 : 1;
@@ -2567,6 +2569,9 @@ function heal(n,src){
 }
 function hurtHero(n,src,type,from){
   const h=S.hero;
+  // Each attacker speaks in its own voice as it lands. One hook here covers
+  // every enemy rather than five, because `from` is the foe that swung.
+  if(SCORE && from) SCORE.voice(from);
   if(h.dodge){ h.dodge=false; say(`you slip aside — the ${src} finds nothing.`);
     addFx({type:'ring',col:h.col,row:h.row,col2:'#54dbd6'}); return; }
   if(type==='magic' && h.barrier){
@@ -2586,6 +2591,7 @@ function hurtHero(n,src,type,from){
   // it with every foe in the room at the end of the round
   if(h.returnFire && n>0) h.reflectPool=(h.reflectPool||0)+n;
   h.flash=performance.now(); shake(2+n);
+  if(n>0 && SCORE) SCORE.sfx('hurt',0.8);     // only when a blow actually lands
   if(n>0) addFx({type:'num',col:h.col,row:h.row,txt:'-'+n,col2:'#ff5c6a'});
   addFx({type:'flash'});
   if(h.hp<=0){ updateHud(); gameOver(); }
@@ -5994,7 +6000,17 @@ cancelAnimationFrame(raf); raf=requestAnimationFrame(frame);
 var SCORE=(()=>{
   const LOOPS=['bed_cold','bed_warm','pulse','tension','melody','hearth',
                'boss_bed','boss_press'];
-  const ONESHOTS=['shrine','clear','death','win'];
+  const ONESHOTS=['shrine','clear','death','win',
+                  'goon','sniper','mortar','warden','agent','lance',
+                  'step','strike','hurt'];
+  /* One voice per character, built from what that character DOES: the goon's
+     footfall, the sniper's shot travelling away, the mortar falling, the
+     warden's plate refusing to break, the Agent's quantised square wave, the
+     Lance's sub. All pitched inside F so a hit lands in tune with the score
+     rather than fighting it. Keyed by display name, which is what survives
+     the roster being re-cut. */
+  const VOICE={ 'goon':'goon', 'sniper':'sniper', 'mortar':'mortar',
+                'warden':'warden', 'agent 180':'agent', 'the lance':'lance' };
   const FADE=0.55;                       // gain ramps read as weather, not switches
   let ctx=null, master=null, gains={}, buf={}, live=false, on=true, loading=null;
 
@@ -6070,6 +6086,14 @@ var SCORE=(()=>{
     const g = ctx.createGain(); g.gain.value = vol; g.connect(master);
     const s = ctx.createBufferSource(); s.buffer = b; s.connect(g); s.start();
   }
+  /* A foe's voice. Bosses get more room; a goon three tiles away should not be
+     as loud as the Lance. An unrecognised name is simply silent rather than
+     borrowing someone else's sound. */
+  function voice(e,vol){
+    if(!e||!e.name) return;
+    const key=VOICE[String(e.name).toLowerCase()];
+    if(key) sfx(key, vol!=null?vol : (e.boss?0.85:0.6));
+  }
   function setOn(v){
     on = v;
     try{ localStorage.setItem('coldcity.sound', on?'on':'off'); }catch(e){}
@@ -6083,7 +6107,7 @@ var SCORE=(()=>{
     if(!ctx) return;
     if(document.hidden) ctx.suspend(); else if(on) ctx.resume();
   });
-  return { unlock, mix, sfx, setOn, isOn:()=>on, get ready(){return live},
+  return { unlock, mix, sfx, voice, setOn, isOn:()=>on, get ready(){return live},
     /* Live stem levels — lets a test assert that a state actually reaches the
        mix, the same way __game.geom and __game.tut make the board and the
        tutorial checkable from outside. */

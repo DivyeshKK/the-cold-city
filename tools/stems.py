@@ -117,6 +117,70 @@ def place(buf, sig, at):
     idx = (np.arange(n) + at) % LOOP_N
     np.add.at(buf, idx, sig)
 
+# ------------------------------------------------------------ harmony ------
+"""A four-chord progression, four bars each, filling the 16-bar loop.
+
+   The first version of this score sat on a single F chord for the whole 53
+   seconds. That is what made it read as ambient rather than as music: no
+   harmonic movement and no rhythm, so nothing ever arrived. Motion comes from
+   HARMONY and ARPEGGIATION, not from adding a drum kit — the early floors stay
+   percussion-free on purpose, so the first kick in the game is still the boss.
+
+   Cold voicings omit the third everywhere (fifths, fourths and ninths only),
+   so the progression moves while the world still feels unresolved. Warm
+   voicings are the same roots with the thirds and sevenths filled in."""
+PROG = ['F', 'Dm', 'Bb', 'C']                       # 4 bars each
+COLD_VOICING = {                                    # no thirds anywhere
+    'F' : ['F2','C3','G3','F3'],                    # F5 add9
+    'Dm': ['D2','A2','E3','D3'],                    # D5 add9
+    'Bb': ['Bb1','F2','C3','Bb2'],                  # Bb5 add9
+    'C' : ['C2','G2','F3','D3'],                    # Csus4 add9
+}
+WARM_VOICING = {
+    'F' : ['F2','A2','C3','E3','G3'],               # Fmaj9
+    'Dm': ['D2','F2','A2','C3','E4'],               # Dm9
+    'Bb': ['Bb1','D3','F3','A3'],                   # Bbmaj7
+    'C' : ['C2','E3','G3','A3','D4'],               # C6/9
+}
+ARP_COLD = {'F':['F3','C4','G4','C4'], 'Dm':['D3','A3','E4','A3'],
+            'Bb':['Bb2','F3','C4','F3'], 'C':['C3','G3','D4','G3']}
+ARP_WARM = {'F':['F3','A3','C4','E4'], 'Dm':['D3','F3','A3','C4'],
+            'Bb':['Bb2','D3','F3','A3'], 'C':['C3','E3','G3','A3']}
+
+CHORD_BEATS = int(BEATS) // len(PROG)               # 16 beats = 4 bars each
+
+def pad_chord(buf, notes, start_beat, len_beats, amp=1.0, harmonics=(1.0,.3,.12,.05),
+              attack=0.9, release=2.2):
+    """One sustained chord with a soft swell, wrapped so the last chord's tail
+       flows back into the first — the loop point lands mid-progression and you
+       cannot hear where it is."""
+    n = int((len_beats * 60.0 / BPM + release) * SR)
+    t = np.arange(n) / SR
+    env = np.minimum(1.0, t / attack)
+    hold = len_beats * 60.0 / BPM
+    env *= np.where(t < hold, 1.0, np.exp(-(t - hold) / (release / 3)))
+    sig = np.zeros(n)
+    for note in notes:
+        f = snap(hz(note))
+        for i, a in enumerate(harmonics, start=1):
+            sig += a * np.sin(2 * np.pi * f * i * t) / len(notes)
+    place(buf, sig * env * amp, int(start_beat * BEAT_N))
+
+def arpeggio(buf, table, amp=0.5, step=0.5, bright=2.6, dur=1.1):
+    """Eighth-note arpeggio across the progression. This is the single thing
+       that stopped the beds feeling like weather and started them feeling like
+       a piece of music — rhythm without a single drum."""
+    per = int(step * BEAT_N)
+    for b in range(int(BEATS / step)):
+        beat = b * step
+        chord = PROG[int(beat // CHORD_BEATS) % len(PROG)]
+        seq = table[chord]
+        note = seq[b % len(seq)]
+        # a gentle swing in emphasis so it breathes instead of machine-gunning
+        a = amp * (1.0 if b % 4 == 0 else 0.62 if b % 2 == 0 else 0.42)
+        place(buf, pluck(hz(note), dur, amp=a,
+                         harmonics=(1.0,.20,.08,.03), bright=bright), b * per)
+
 def hit(seed, dur, cutoff, amp=1.0, hp=None, curve=6.0):
     """Percussive noise burst — kick body, breath, cymbal-ish depending on args."""
     n = int(dur * SR)
@@ -154,30 +218,32 @@ def write(name, sig, peak=0.7):
 # ================================================================ STEMS ====
 
 def bed_cold():
-    """Floors 0-8. Root, fifth, octave, Lydian #11. No third — nothing to hold on to."""
-    x  = stack(hz('F2'), [1.0, .30, .12, .05]) * lfo(3, .55, 1.0)
-    x += stack(hz('C3'), [.45, .14, .05]) * lfo(2, .35, .85, phase=1.1)
-    x += stack(hz('F3'), [.26, .08]) * lfo(5, .30, .70, phase=2.3)
-    x += sine(hz('B4'), .045) * lfo(8, .0, 1.0, phase=.7)      # the #11 glint
-    x += sine(hz('E5'), .035) * lfo(11, .0, 1.0, phase=2.0)    # maj7 air
-    x += sine(hz('C5'), .028) * lfo(7, .0, 1.0, phase=3.4)
-    x += noise_loop(11, 3800, hp=900) * 0.030 * lfo(2, .5, 1.0)   # tape hiss
-    x += noise_loop(12, 260) * 0.055 * lfo(3, .4, 1.0, phase=1.7)  # room rumble
+    """Floors 0-8. Fifths, fourths and ninths — no third anywhere, so the
+       progression moves without ever resolving. Arpeggio carries the pulse."""
+    x = np.zeros(LOOP_N)
+    for i, chord in enumerate(PROG):
+        pad_chord(x, COLD_VOICING[chord], i*CHORD_BEATS, CHORD_BEATS,
+                  amp=1.0, harmonics=(1.0,.30,.12,.05))
+    arpeggio(x, ARP_COLD, amp=0.34, bright=2.2, dur=1.0)
+    x += sine(hz('B4'), .030) * lfo(8, .0, 1.0, phase=.7)      # the #11 glint
+    x += sine(hz('C5'), .022) * lfo(7, .0, 1.0, phase=3.4)
+    x += noise_loop(11, 3800, hp=900) * 0.026 * lfo(2, .5, 1.0)   # tape hiss
+    x += noise_loop(12, 260) * 0.045 * lfo(3, .4, 1.0, phase=1.7)  # room rumble
     return x
 
 def bed_warm():
-    """Floors 9-18. Same root so it crossfades with the cold bed — but the
-       third and the ninth arrive, and the world stops being indifferent."""
-    x  = stack(hz('F2'), [1.0, .28, .10, .04]) * lfo(3, .60, 1.0)
-    x += stack(hz('C3'), [.40, .13]) * lfo(2, .45, .90, phase=1.1)
-    x += stack(hz('A3'), [.42, .16, .06]) * lfo(4, .35, .95, phase=.4)   # THE THIRD
-    x += stack(hz('E4'), [.24, .08]) * lfo(3, .30, .85, phase=2.2)       # maj7
-    x += stack(hz('D4'), [.18, .06]) * lfo(5, .20, .75, phase=3.1)       # sixth
-    x += stack(hz('G4'), [.13, .04]) * lfo(6, .15, .65, phase=1.5)       # ninth
-    x += sine(hz('C5'), .05) * lfo(9, .1, 1.0, phase=.9)
-    x += sine(hz('A4'), .06) * lfo(7, .1, 1.0, phase=2.6)
-    x += noise_loop(21, 2400, hp=500) * 0.026 * lfo(2, .6, 1.0)
-    x += noise_loop(22, 200) * 0.048 * lfo(3, .5, 1.0, phase=2.0)
+    """Floors 9-18. Same roots and the same rhythm, so it crossfades with the
+       cold bed — but the thirds and sevenths fill in and the world stops
+       being indifferent."""
+    x = np.zeros(LOOP_N)
+    for i, chord in enumerate(PROG):
+        pad_chord(x, WARM_VOICING[chord], i*CHORD_BEATS, CHORD_BEATS,
+                  amp=1.0, harmonics=(1.0,.26,.10,.04))
+    arpeggio(x, ARP_WARM, amp=0.40, bright=3.0, dur=1.3)
+    x += sine(hz('C5'), .035) * lfo(9, .1, 1.0, phase=.9)
+    x += sine(hz('A4'), .040) * lfo(7, .1, 1.0, phase=2.6)
+    x += noise_loop(21, 2400, hp=500) * 0.022 * lfo(2, .6, 1.0)
+    x += noise_loop(22, 200) * 0.040 * lfo(3, .5, 1.0, phase=2.0)
     return x
 
 def pulse():
@@ -213,15 +279,24 @@ def melody():
     """The pilgrim's theme. Sparse, unhurried, mostly silence — it should feel
        like something half-remembered rather than a tune being performed."""
     x = np.zeros(LOOP_N)
-    # (beat, note, amp) — F major, leaning on the sixth and the maj7
+    # (beat, note, amp) — a real tune now, following the chords underneath it
+    # rather than drifting over a single one. Still leaves room to breathe, but
+    # something arrives at least every couple of beats.
     phrase = [
-        (0,  'F4', .85), (2,  'A4', .70), (3,  'C5', .62),
-        (6,  'A4', .55), (8,  'G4', .78), (10, 'F4', .60),
-        (14, 'D4', .72), (16, 'F4', .55), (19, 'E5', .68),
-        (22, 'C5', .58), (24, 'A4', .62), (28, 'F4', .80),
-        (32, 'C5', .55), (35, 'D5', .60), (38, 'A4', .50),
-        (42, 'F4', .70), (46, 'E4', .55), (48, 'G4', .62),
-        (52, 'F4', .58), (56, 'C4', .70), (60, 'F3', .65),
+        # F                                   Dm
+        (0,'F4',.85), (1.5,'A4',.62), (3,'C5',.70), (5,'A4',.55),
+        (6.5,'G4',.60), (8,'F4',.75), (10,'C5',.58), (12,'A4',.66),
+        (14,'G4',.55),
+        (16,'D4',.80), (17.5,'F4',.60), (19,'A4',.72), (21,'C5',.58),
+        (22.5,'A4',.55), (24,'F4',.70), (26,'E4',.60), (28,'D4',.74),
+        (30,'A3',.55),
+        # Bb                                  C
+        (32,'F4',.78), (33.5,'D4',.58), (35,'Bb3',.70), (37,'D4',.60),
+        (38.5,'F4',.64), (40,'A4',.72), (42,'F4',.58), (44,'D4',.66),
+        (46,'Bb3',.60),
+        (48,'C4',.80), (49.5,'E4',.60), (51,'G4',.72), (53,'A4',.62),
+        (54.5,'G4',.55), (56,'E4',.68), (58,'D4',.58), (60,'C4',.76),
+        (62,'F3',.66),
     ]
     for beat, note, amp in phrase:
         n = pluck(hz(note), 3.2, amp=amp, harmonics=(1.0, .30, .14, .06), bright=2.2)
@@ -232,15 +307,11 @@ def hearth():
     """The ramen stall and the shops. Warm, close, no threat. Diegetic-feeling —
        this is the one place in the game that is on the pilgrim's side."""
     x = np.zeros(LOOP_N)
-    arp = ['F3', 'A3', 'C4', 'E4', 'C4', 'A3']
-    for b in range(int(BEATS)):
-        note = arp[b % len(arp)]
-        n = pluck(hz(note), 2.4, amp=.55 if b % 2 else .70,
-                  harmonics=(1.0, .22, .09, .03), bright=2.8)
-        place(x, n, int(b * BEAT_N))
-    x += stack(hz('F2'), [.40, .10]) * lfo(2, .6, 1.0)
-    x += stack(hz('A3'), [.14, .05]) * lfo(3, .4, .9, phase=1.2)
-    x += noise_loop(51, 1400, hp=300) * 0.045 * lfo(2, .6, 1.0)   # room tone
+    arpeggio(x, ARP_WARM, amp=0.72, step=0.5, bright=3.4, dur=2.0)
+    for i, chord in enumerate(PROG):
+        pad_chord(x, WARM_VOICING[chord][:3], i*CHORD_BEATS, CHORD_BEATS,
+                  amp=0.34, harmonics=(1.0,.18,.06))
+    x += noise_loop(51, 1400, hp=300) * 0.040 * lfo(2, .6, 1.0)   # room tone
     return x
 
 def boss_bed():
@@ -307,6 +378,101 @@ def sfx_death():
     out += 0.06 * rng.standard_normal(n) * np.exp(-t * 2.5)
     return oneshot(out)
 
+# ------------------------------------------------- character voices --------
+"""One sound per character, each built from the thing that character DOES —
+   the mechanic the player has to learn is the mechanic they hear.
+
+   All of them are pitched inside F, so a hit lands in tune with whatever the
+   score is playing underneath rather than fighting it. They are short: these
+   fire constantly, and anything with a tail becomes noise within two turns."""
+
+def glide(f0, f1, dur, curve=1.0):
+    """A pitch sweep — the backbone of most of these."""
+    n = int(dur * SR); t = np.arange(n) / SR
+    f = f0 * (f1/f0) ** ((t/dur) ** curve)
+    return np.sin(2*np.pi*np.cumsum(f)/SR), t, n
+
+def sfx_goon():
+    """Heavy, dumb, close. A boot landing and a short grunt of effort."""
+    out = hit(2001, 0.26, 220, amp=0.9, curve=16.0)                  # footfall
+    n = len(out); t = np.arange(n)/SR
+    body = np.sin(2*np.pi*snap(hz('F2'))*t) * np.exp(-t*14)
+    return oneshot(out*0.7 + body*0.5)
+
+def sfx_sniper():
+    """A rifle report is wrong for this game — what the sniper does is REACH.
+       A tight high crack, then the shot travelling away from you."""
+    crack = hit(2002, 0.09, 9000, amp=1.0, hp=2500, curve=48.0)
+    w, t, n = glide(hz('C6'), hz('C5'), 0.34, curve=0.55)
+    tail = w * np.exp(-t*9) * 0.42
+    out = np.zeros(max(len(crack), n))
+    out[:len(crack)] += crack
+    out[:n] += tail
+    return oneshot(out)
+
+def sfx_mortar():
+    """Falling, not firing — the mortar's whole lesson is that it lands where
+       you WERE, so the sound is the descent and the thump at the end of it."""
+    w, t, n = glide(hz('A4'), hz('A2'), 0.55, curve=1.7)
+    fall = w * np.exp(-t*2.2) * 0.5
+    out = np.zeros(int(0.9*SR)); out[:n] += fall
+    boom = hit(2003, 0.42, 130, amp=1.0, curve=8.0)
+    at = int(0.42*SR); out[at:at+len(boom)] += boom[:len(out)-at]
+    return oneshot(out)
+
+def sfx_warden():
+    """Heavy plate. Blades glance off it, so it should sound like a struck bell
+       that refuses to break — metallic, and unmoved."""
+    n = int(1.1*SR); t = np.arange(n)/SR; out = np.zeros(n)
+    # inharmonic partials are what make metal sound like metal, not like a note
+    for mult, amp in [(1,.9),(2.76,.5),(5.4,.28),(8.9,.14),(13.3,.07)]:
+        out += amp*np.sin(2*np.pi*snap(hz('F2'))*mult*t)*np.exp(-t*(2.5+mult*0.5))
+    strike = hit(2004, 0.18, 3000, amp=0.35, hp=800, curve=26.0)
+    out[:len(strike)] += strike            # shorter than the ring; add, don't slice
+    return oneshot(out)
+
+def sfx_agent():
+    """Agent 180 rewrites the floor under you. Digital, wrong, deliberately
+       machine-like — the one voice in the game that isn't organic."""
+    n = int(0.5*SR); t = np.arange(n)/SR
+    steps = np.floor(t*28)/28                       # quantised = mechanical
+    f = snap(hz('C4')) * (2 ** (np.sin(steps*7.0)*0.55))
+    out = np.sign(np.sin(2*np.pi*np.cumsum(f)/SR)) * 0.34      # square wave
+    out *= np.exp(-t*5.5) * (1 - 0.4*np.sin(t*220))
+    return oneshot(out)
+
+def sfx_lance():
+    """The final boss marks the floor and then takes it. The biggest sound in
+       the game: sub weight first, metal on top, and a long ring."""
+    n = int(1.6*SR); t = np.arange(n)/SR
+    out = np.sin(2*np.pi*snap(hz('F1'))*t)*np.exp(-t*2.0)*1.0
+    out += np.sin(2*np.pi*snap(hz('C2'))*t)*np.exp(-t*2.6)*0.5
+    for mult, amp in [(6.1,.20),(9.7,.12),(14.2,.06)]:
+        out += amp*np.sin(2*np.pi*snap(hz('F2'))*mult*t)*np.exp(-t*3.2)
+    imp = hit(2005, 0.30, 180, amp=0.8, curve=9.0)
+    out[:len(imp)] += imp
+    return oneshot(out)
+
+def sfx_step():
+    """The pilgrim. Soft, small, and quiet enough to hear a hundred times."""
+    return oneshot(hit(2006, 0.13, 900, amp=0.5, hp=180, curve=34.0))
+
+def sfx_strike():
+    """A blade. Air first, then the contact."""
+    sw = hit(2007, 0.16, 6500, amp=0.55, hp=1400, curve=26.0)
+    n = len(sw); t = np.arange(n)/SR
+    edge = np.sin(2*np.pi*snap(hz('C5'))*t)*np.exp(-t*26)*0.30
+    return oneshot(sw + edge)
+
+def sfx_hurt():
+    """The pilgrim taking a hit. Dull and internal — felt, not heard."""
+    n = int(0.34*SR); t = np.arange(n)/SR
+    out = np.sin(2*np.pi*snap(hz('F2'))*t)*np.exp(-t*11)*0.8
+    out += np.sin(2*np.pi*snap(hz('B2'))*t)*np.exp(-t*15)*0.35   # the tritone
+    thud = hit(2008, 0.16, 700, amp=0.4, curve=22.0)
+    out[:len(thud)] += thud
+    return oneshot(out)
+
 def sfx_win():
     """The world finally warms. Slow attack, full Fmaj7 add9, no percussion."""
     n = int(5.0 * SR); t = np.arange(n) / SR
@@ -333,7 +499,15 @@ if __name__ == '__main__':
     for name, fn, pk in loops:
         p = write(name, fn(), peak=pk)
         print(f'  {name:16s} peak {pk:.2f}  {os.path.getsize(p)/1e6:5.1f} MB')
-    for name, fn in [('sfx/shrine.wav', sfx_shrine), ('sfx/clear.wav', sfx_clear),
-                     ('sfx/death.wav', sfx_death),   ('sfx/win.wav', sfx_win)]:
-        p = write(name, fn(), peak=0.72)
-        print(f'  {name:16s} {os.path.getsize(p)/1e6:5.1f} MB')
+    # One-shots stay a touch under the loops so a hit reads as an event on top
+    # of the music rather than punching a hole through it.
+    shots = [('shrine',sfx_shrine,.72), ('clear',sfx_clear,.72),
+             ('death',sfx_death,.72),   ('win',sfx_win,.75),
+             ('goon',sfx_goon,.62),     ('sniper',sfx_sniper,.55),
+             ('mortar',sfx_mortar,.68), ('warden',sfx_warden,.62),
+             ('agent',sfx_agent,.52),   ('lance',sfx_lance,.75),
+             ('step',sfx_step,.34),     ('strike',sfx_strike,.55),
+             ('hurt',sfx_hurt,.62)]
+    for name, fn, pk in shots:
+        p = write('sfx/'+name+'.wav', fn(), peak=pk)
+        print(f'  sfx/{name+".wav":13s} peak {pk:.2f}  {os.path.getsize(p)/1e3:5.0f} KB')
