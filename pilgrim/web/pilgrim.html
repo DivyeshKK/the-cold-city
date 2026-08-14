@@ -59,8 +59,14 @@
      the board is sized for a viewport taller than the one it's in, and the
      bottom row falls off the screen. It stays a constant on purpose: the slot
      squares are sized from it and are square, so measuring it at runtime
-     would feed straight back into itself. */
-  :root{--chrome:245px}
+     would feed straight back into itself.
+     Bumped 245->350: the Game Guide row and its one-time callout both landed
+     under here later without this ever being re-tuned, so anything around a
+     768px-tall window (the most common laptop height) grew a vertical
+     scrollbar and the whole panel shifted while it filled in. 350 is the
+     smallest value that stays scrollbar-free there, verified by measuring
+     document.documentElement.scrollHeight against the viewport directly. */
+  :root{--chrome:350px}
   .stageWrap{position:relative;margin:0 auto;aspect-ratio:180/320;
     width:min(100%, 405px, calc((100dvh - var(--chrome)) * 0.5));
     border:1px solid var(--edge);background:#080410;overflow:hidden;
@@ -523,11 +529,14 @@
   button:disabled{opacity:.3;cursor:not-allowed}
   .spacer{flex:1}
 
-  /* the game is waiting on you: an attack offer announces itself */
-  .strikeRow{display:flex;gap:8px}
+  /* the game is waiting on you: an attack offer announces itself. Reserved
+     at a constant height whether it holds zero or several targets, so the
+     button grid below doesn't jump every time a strike becomes offered. */
+  .strikeRow{display:flex;gap:8px;justify-content:center;min-height:36px}
   button.strike{color:#fff;border-color:rgba(255,92,106,.65);
     background:linear-gradient(180deg,rgba(255,92,106,.22),rgba(255,92,106,.08));
-    animation:await 1.15s ease-in-out infinite}
+    animation:await 1.15s ease-in-out infinite;
+    height:36px;padding:0 14px;display:flex;align-items:center;justify-content:center}
   button.strike:hover{background:rgba(255,92,106,.3);border-color:var(--danger)}
   @keyframes await{
     0%,100%{box-shadow:0 0 0 0 rgba(255,92,106,.45)}
@@ -576,7 +585,11 @@
   #btnSalvage:hover:not(:disabled){border-color:var(--danger);
     background:rgba(255,92,106,.3);color:#fff}
 
-  details{margin-top:12px;border:1px solid var(--edge);background:rgba(22,13,36,.4)}
+  /* Matches the slot bar and button grid above it exactly, rather than
+     stretching to the page's wider max-width — otherwise it reads as a
+     different panel instead of the last row of the same control block. */
+  details{margin:12px auto 0;border:1px solid var(--edge);background:rgba(22,13,36,.4);
+    width:min(100%, 405px, calc((100dvh - var(--chrome)) * 0.5))}
   summary{cursor:pointer;font-size:10px;letter-spacing:.18em;text-transform:uppercase;
     color:var(--dim);padding:10px 13px;list-style:none}
   summary::-webkit-details-marker{display:none}
@@ -2178,9 +2191,13 @@ function heroProfile(type){
            amp  : 1,
            type : magic?'magic':'physical' };
 }
-function heroDamageTo(e,type){
+function heroDamageTo(e,type,dist=0){
   const p=heroProfile(type);
-  return calcDamage({...p, def:e.def, vuln:e.vuln||0});
+  // Mirrors playerStrike's own rangePenalty: an arrow loosed from more than
+  // a tile off lands soft. Without this the hover preview showed full
+  // point-blank damage even for a hit that would actually land at half.
+  const rangePenalty = (type!=='magic' && dist>1) ? 0.5 : 1;
+  return calcDamage({...p, def:e.def, vuln:e.vuln||0, amp:p.amp*rangePenalty});
 }
 
 /* ============================ FLOOR SETUP ============================ */
@@ -4249,9 +4266,18 @@ function talkToNpc(npc){
 
 /* ============================ END STATES ============================ */
 function gameOver(){
+  // S.over/S.phase flip immediately — that's what halts the enemy-turn loop
+  // and any further input — but the curtain itself is display:none/grid with
+  // no fade, so showing it in the same instant as the killing blow swallowed
+  // the hit-flash, the shake, and the floating damage number before any of
+  // them had a frame to read. Freeze the run now; let the blow land first.
+  const gen=S.gen;
   S.over='loss'; S.phase='over'; updateHud();
-  say('you fall. the city does not notice.');
-  showCurtain('loss','the world stays indifferent. the smog closes over a quiet shape.');
+  setTimeout(()=>{
+    if(gen!==S.gen) return;                  // a fresh run started in the meantime
+    say('you fall. the city does not notice.');
+    showCurtain('loss','the world stays indifferent. the smog closes over a quiet shape.');
+  }, 650);
 }
 function win(){
   S.over='win'; S.phase='over'; updateHud();
@@ -5521,7 +5547,7 @@ function drawTokens(now){
     // leak its position through the fog.)
     if(!e.boss){
       const hovered = hover && atFootprint(e,hover.col,hover.row) && S.attackable.has(e);
-      const preview = hovered? Math.max(0,e.hp-heroDamageTo(e,'physical')) : e.hp;
+      const preview = hovered? Math.max(0,e.hp-heroDamageTo(e,'physical',chebToUnit(S.hero,e))) : e.hp;
       const cxOf = (e.size||1)>1 ? pxOf(e.vx!==undefined?e.vx:e.col)+TILE/2*(e.size-1)
                                   : pxOf(e.vx!==undefined?e.vx:e.col);
       const x=cxOf-e.maxHp, y=pyOf(e.vy!==undefined?e.vy:e.row)+2;
