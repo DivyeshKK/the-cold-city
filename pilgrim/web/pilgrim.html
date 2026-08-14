@@ -24,12 +24,18 @@
   }
   *{box-sizing:border-box}
   html{touch-action:manipulation}
-  body{margin:0}
+  /* The backdrop belongs to the page, not to the column of content. It used
+     to live on .wrap, which is capped at 960px — so on anything wider than
+     that the sides of a laptop screen were left bare white. */
+  html,body{background:#080410}
+  body{margin:0;min-height:100dvh;
+    background:radial-gradient(120% 90% at 50% -10%, #1a0f2b 0%, #0e0716 55%, #080410 100%)
+      no-repeat;
+    background-size:cover}
   .wrap{
     max-width:960px; margin:0 auto; padding:20px 16px 40px;
     font-family:var(--body);
     color:var(--ink);
-    background:radial-gradient(120% 90% at 50% -10%, #1a0f2b 0%, #0e0716 55%, #080410 100%);
     min-height:100dvh;
   }
   .titlebar{margin-bottom:10px;text-align:center}
@@ -136,13 +142,6 @@
     50%    {box-shadow:0 0 0 5px rgba(244,238,251,0)}
   }
   .bubble.clickable:hover{background:#fff}
-  /* If they click the board while the box has the floor, shake it — the click
-     did land somewhere, and this shows where it needed to go. */
-  .bubble.nudge{animation:pop .18s ease-out, shakeBox .32s ease-in-out}
-  @keyframes shakeBox{
-    0%,100%{margin-left:0} 20%{margin-left:-5px} 45%{margin-left:5px}
-    70%{margin-left:-3px} 88%{margin-left:2px}
-  }
   /* the board itself now dims on the canvas (see drawTutorialDim) so the
      tile the box is talking about can stay lit through it — the CSS
      filter used to darken everything uniformly, target included */
@@ -4137,6 +4136,10 @@ function win(){
    board turned portrait (it was 12x6 landscape before that); every build
    since is 2.x. Each entry is [number, date, [lines]] — add to the top. */
 const VERSIONS=[
+  ['2.7.2','13 Aug 2026',[
+    'A tutorial box closes on a click anywhere, not just on its little triangle',
+    'The dark backdrop reaches the edges of the screen once the game starts, instead of leaving white down the sides of a wide window',
+  ]],
   ['2.7.1','13 Aug 2026',[
     'The run buttons sit as one block the width of the board, and the whole screen fits again',
     'The SAFE / IN COMBAT badge moved to the top of the board, centred',
@@ -4458,10 +4461,15 @@ function protectedTiles(excludeKey){
 // Every tutorial box is clickable anywhere on it — that's the only way a
 // box goes away now; nothing times out on its own any more. The triangle
 // in the corner is just the visual hint that it's clickable.
+/* Whatever will close the box that currently has the floor. Kept here so a
+   click anywhere — the board, the HUD, the page around them — can dismiss
+   it, rather than only the little triangle in its corner. */
+let tutDismiss=null;
 function addDismissTri(d,onDismiss){
   if(!onDismiss) return;
+  tutDismiss=onDismiss;
   d.classList.add('clickable');
-  d.onclick=()=>onDismiss();
+  d.onclick=ev=>{ ev.stopPropagation(); onDismiss(); };
   const t=document.createElement('div');
   t.className='dismissTri';
   d.appendChild(t);
@@ -4469,6 +4477,7 @@ function addDismissTri(d,onDismiss){
 function renderBubbles(list){
   const box=document.getElementById('bubbles');
   box.innerHTML='';
+  tutDismiss=null;                      // re-set by addDismissTri below, if any
   const itemBox=document.getElementById('itemBubble');
   itemBox.className='bubble dock'; itemBox.innerHTML=''; itemBox.style.display='none';
   // whatever the box is pointing at on the board stays lit when the dim
@@ -5765,10 +5774,9 @@ cv.addEventListener('click',ev=>{
     if(tutClickTarget && t && t.col===tutClickTarget.c && t.row===tutClickTarget.r){
       tutClickTarget.onDismiss(); tutClickTarget=null; return;
     }
-    // their click was real — bounce the box so they see where it must go
-    for(const el of document.querySelectorAll('.bubble.clickable')){
-      el.classList.remove('nudge'); void el.offsetWidth; el.classList.add('nudge');
-    }
+    // anywhere else closes it. Making people hunt for the triangle taught
+    // them nothing the box hadn't already said.
+    if(tutDismiss){ const go=tutDismiss; tutDismiss=null; go(); }
     return;
   }
   if(S.walking) return;                             // already on her way out
@@ -5813,6 +5821,16 @@ document.addEventListener('click',ev=>{
   if(ev.target.closest('#slotBarWrap')||ev.target.closest('#btnSalvage')) return;
   clearItemSelection();
 });
+/* A tutorial box closes on a click anywhere, not just on its own triangle.
+   The canvas handler covers the board; this covers everything around it —
+   the HUD, the slot bar, the page. Runs on capture so it lands even when the
+   thing clicked stops the event on its way up. */
+document.addEventListener('click',ev=>{
+  if(!bubbleBlocking||!tutDismiss) return;
+  if(ev.target.closest('canvas')) return;       // the board has its own path
+  if(ev.target.closest('.bubble')) return;      // and so does the box itself
+  const go=tutDismiss; tutDismiss=null; go();
+},true);
 document.getElementById('btnRestart').onclick=restart;
 document.getElementById('btnRestart').innerHTML=
   `<img class="btnIcon" src="${UI_ICONS.icon_restart}" alt="">Restart`;
