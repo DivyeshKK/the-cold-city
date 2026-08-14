@@ -609,18 +609,23 @@
   .scroll{overflow-x:auto}
 
   /* Phones and short windows: strip the page furniture so the board itself
-     keeps as much of the viewport as possible. --chrome drops to match. */
+     keeps as much of the viewport as possible. --chrome drops to match.
+     Game Guide's closed <summary> row (~35px) stays — it's the only way
+     to reach combat rules and the enemy bestiary on a phone, so hiding it
+     entirely (as this rule used to) leaves mobile players with no way to
+     open it at all. */
   @media (max-height:760px), (max-width:560px){
-    :root{--chrome:199px}
+    :root{--chrome:234px}
     .wrap{padding:8px 8px 12px}
     .titlebar{margin-bottom:6px}
     .titlebar h1{font-size:17px;letter-spacing:.18em}
     .slotBar{margin-top:8px}
     .bar{margin-top:8px}
-    details{display:none}
-    /* The callout points at Game Guide's summary — hidden right above this
-       rule. Left showing on its own, it floated with nothing to point at,
-       reading as a stray, disconnected block under the real controls. */
+    details{margin-top:8px}
+    /* The callout points at Game Guide's summary, which is visible again
+       above this rule, but the callout's own multi-line block still costs
+       more space than a phone screen should spend — the pulsing summary
+       (#gameGuide.nag) carries the same "look here" signal on its own. */
     .guideCallout{display:none}
   }
 </style>
