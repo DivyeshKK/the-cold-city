@@ -621,6 +621,34 @@
   .rules th{color:var(--faint);text-transform:uppercase;letter-spacing:.12em;font-size:8.5px}
   .scroll{overflow-x:auto}
 
+  /* ---- the opening cutscene ----
+     Black, full-window, above every other layer. Text only: lines stack up
+     inside a page, then the whole page fades out and the next one comes up. */
+  .opening{position:fixed;inset:0;z-index:60;background:#000;display:none;
+    align-items:center;justify-content:center;cursor:pointer;overflow:hidden}
+  .opening.show{display:flex}
+  .openLines{position:relative;z-index:2;text-align:center;padding:0 22px;
+    font-family:var(--display);font-size:clamp(18px,4.4vw,28px);
+    letter-spacing:.10em;line-height:1.9;color:#fff;
+    opacity:1;transition:opacity 1s ease}
+  .openLines.out{opacity:0}               /* the click takes the page away */
+  .openLines div{opacity:0;transition:opacity 1.1s ease}
+  .openLines div.in{opacity:1}
+  .openLines .grn{color:#3fe07a}
+  .openLines .pur{color:#c08cff}
+  /* "sealed" holds white for a second, drops a frame, and comes back red.
+     Two steps rather than a strobe — it should read as a fault, not a flash. */
+  .openLines .seal{display:inline-block;animation:sealGlitch .34s steps(1) 1s 1 both}
+  @keyframes sealGlitch{
+    0%  {color:#fff;      transform:translate(0,0)}
+    35% {color:#8a1520;   transform:translate(-2px,1px)}
+    70% {color:#ff3b46;   transform:translate(2px,-1px)}
+    100%{color:#ff3b46;   transform:translate(0,0)}
+  }
+  .openSkip{position:absolute;bottom:18px;left:0;right:0;text-align:center;
+    font-size:9px;letter-spacing:.22em;text-transform:uppercase;
+    color:rgba(255,255,255,.35);z-index:3}
+
   /* Phones and short windows: strip the page furniture so the board itself
      keeps as much of the viewport as possible. --chrome drops to match.
      Game Guide's closed <summary> row (~35px) stays — it's the only way
@@ -763,6 +791,13 @@
        plain fixed-viewport fader outside the transformed subtree can't
        shrink out from under itself, no matter when the stage resizes. -->
   <div class="fader" id="fader"></div>
+
+  <!-- The opening. Sits outside .stageWrap so it owns the whole window
+       rather than the board's little frame. -->
+  <div class="opening" id="opening">
+    <div class="openLines" id="openLines"></div>
+    <div class="openSkip" id="openSkip">Click to continue</div>
+  </div>
 
   <div class="slotBarWrap" id="slotBarWrap">
     <div class="slotBar" id="slotBar"></div>
@@ -4292,6 +4327,25 @@ function win(){
    board turned portrait (it was 12x6 landscape before that); every build
    since is 2.x. Each entry is [number, date, [lines]] — add to the top. */
 const VERSIONS=[
+  ['2.8.1','14 Aug 2026',[
+    'An opening: three pages of text on black before the first floor',
+    'The lines stack up two seconds apart, and a click turns the page',
+    'The word sealed holds white for a second, glitches, and comes back red',
+    'The Pilgrim lands on the first floor rather than appearing on it',
+  ]],
+  ['2.8.0','13 Aug 2026',[
+    'The Rules panel is now the Game Guide, and it glows until you have opened it once',
+    'A bestiary that fills in as you meet them — exact damage, reach, movement and wall habits for every enemy',
+    'The Game Guide is reachable on a phone again, instead of being hidden below a certain window size',
+    'Sharpen and Harden are out of the general draft — they were only ever weaker copies of Power Strike and Knight Armor',
+    'Armor is +1 to what you shrug off and +1 health, so it trades against Shield Block instead of repeating it',
+    'No more ghost of the title screen flashing through as the game fades in',
+    'The strike row holds its height, so the buttons underneath stop jumping every time a target appears',
+    'The Game Guide lines up with the board and the buttons above it',
+    'The whole screen fits on a laptop again, with no page scrollbar mid-fight',
+    'Hovering a ranged strike shows the damage it will really do at that distance, falloff included',
+    'A killing blow gets a breath to land — the flash, shake and number read before Run Over cuts in',
+  ]],
   ['2.7.2','13 Aug 2026',[
     'A tutorial box closes on a click anywhere, not just on its little triangle',
     'The dark backdrop reaches the edges of the screen once the game starts, instead of leaving white down the sides of a wide window',
@@ -6074,18 +6128,85 @@ elTitleName.addEventListener('click',()=>{
   elNag.classList.add('show');
   nagTimer=setTimeout(()=>elNag.classList.remove('show'),1500);
 });
-/* Play: out through black, swap the board in behind it, then back up. */
+/* ============================ THE OPENING ============================
+   Three pages of text on black. Inside a page the lines stack up two
+   seconds apart on their own; a click ends the page, fades it out, and two
+   seconds later the next one comes up. The last page hands off to floor 0.
+   Every timer lives in one list so a click can cancel the lot. */
+const OPENING_PAGES=[
+  [ 'The city is <span class="seal">sealed</span>.',
+    'The <span class="grn">TYRANT</span> has the entire city in shackles of blood and gold.',
+    'The weak starve. The strong die.' ],
+  [ 'Reach the tower. Find the <span class="grn">TYRANT</span>.',
+    'Destroy anything that gets in the way.' ],
+  [ '<span class="pur">Free</span> the city from its chains.' ],
+];
+const OPEN_LINE_GAP = 2000;   // between lines inside a page
+const OPEN_PAGE_GAP = 2000;   // from the click to the next page appearing
+let openTimers=[], openingDone=false;
+/* What a click does right now. Null while a page is fading out or the gap
+   is running, so a stray second click can't punch through to the game. */
+let openAdvance=null;
+function afterOpening(){
+  if(openingDone) return;                 // a skip and the last timer can race
+  openingDone=true;
+  openAdvance=null;
+  for(const t of openTimers) clearTimeout(t);
+  openTimers=[];
+  const box=document.getElementById('opening');
+  box.className='opening';
+  const lines=document.getElementById('openLines');
+  lines.className='openLines';
+  lines.innerHTML='';
+  titleMode=false;
+  elTitle.className='curtain title';
+  document.getElementById('wrap').classList.remove('titling');
+  fitStage();
+  restart();
+  shake(7);                               // he lands, rather than appears
+  setTimeout(()=>{ if(S&&!S.over) shake(4); },110);
+  setTimeout(()=>elFader.classList.remove('on'),80);
+}
+function playOpening(){
+  openingDone=false; openTimers=[];
+  const box=document.getElementById('opening');
+  const lines=document.getElementById('openLines');
+  const at=(ms,fn)=>{ const id=setTimeout(fn,ms); openTimers.push(id); return id; };
+  box.className='opening show';
+  document.getElementById('openSkip').textContent='click to continue';
+
+  function showPage(p){
+    lines.className='openLines';
+    lines.innerHTML=OPENING_PAGES[p].map(t=>'<div>'+t+'</div>').join('');
+    const kids=[...lines.children];
+    at(60,()=>kids[0].classList.add('in'));      // a tick, so the fade runs
+    for(let i=1;i<kids.length;i++) at(60+i*OPEN_LINE_GAP,()=>kids[i].classList.add('in'));
+    openAdvance=()=>endPage(p);
+  }
+  function endPage(p){
+    openAdvance=null;                            // deaf until the next page is up
+    for(const t of openTimers) clearTimeout(t);
+    openTimers=[];
+    lines.className='openLines out';             // everything showing fades away
+    if(p+1<OPENING_PAGES.length){ at(OPEN_PAGE_GAP,()=>showPage(p+1)); return; }
+    at(OPEN_PAGE_GAP,()=>{                       // last page: on to the road
+      elFader.classList.add('on');
+      at(700,afterOpening);
+    });
+  }
+  at(400,()=>showPage(0));
+}
+/* Play: black out, run the opening, then the road. */
 document.getElementById('btnPlay').addEventListener('click',()=>{
   if(!titleMode) return;
   elFader.classList.add('on');
-  setTimeout(()=>{
-    titleMode=false;
-    elTitle.className='curtain title';
-    document.getElementById('wrap').classList.remove('titling');
-    fitStage();                                  // back into the framed board
-    restart();                                   // floor 0, built behind the black
-    setTimeout(()=>elFader.classList.remove('on'),80);
-  },760);
+  setTimeout(()=>{ elFader.classList.remove('on'); playOpening(); },760);
+});
+document.getElementById('opening').addEventListener('click',()=>{
+  /* Only a page that's actually up answers a click. Mid-fade and in the gap
+     between pages openAdvance is null and we swallow it, so an impatient
+     double-click can't skip a page it never got to read. */
+  if(openAdvance) openAdvance();
 });
 const elTitleCredits=document.getElementById('titleCredits');
 document.getElementById('btnTitleCredits').addEventListener('click',()=>{
