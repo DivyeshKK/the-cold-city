@@ -1,13 +1,16 @@
 """
 THE COLD CITY — adaptive score stems.
 
-Everything is F major / F Lydian at 72 BPM, 16 bars (53.333 s), so any stem
-layers under any other. Intensity comes from density and register, never tempo.
+Every stem is the SAME 16-bar phrase at 163 BPM (23.6 s), transcribed from the
+Logic session, so any stem layers under any other. Intensity comes from density
+and register, never from tempo.
 
-The warmth arc is harmonic, not just timbral:
-    cold  = root, fifth, octave, and the Lydian #11 (B). No third.
-    warm  = the third (A) and the sixth/ninth (D, G) arrive. Fmaj7 opens up.
-Boss material darkens to F7 (adds Eb) without leaving the key.
+The music is in D minor — the relative minor of F, which is what the one-shots
+are pitched to, so voices and score share a scale.
+
+The warmth arc is register and density, not different harmony:
+    cold  = the ostinato over one bass octave, thin and high.
+    warm  = the octave below arrives, thirds fill in, a pad underneath.
 
 SEAMLESS LOOPING: a sustained tone only loops cleanly if it completes a whole
 number of cycles in the loop. Every frequency is snapped to the nearest such
@@ -17,11 +20,18 @@ are rendered past the loop end and the tail is folded back onto the start.
 import numpy as np, wave, struct, os
 
 SR       = 44100
-BPM      = 72.0
+BPM      = 163.0
+# 16 bars is the length of the written phrase (Logic bars 65-80), so the loop
+# IS the composition rather than a slice of it. 23.6 s at this tempo.
 BARS     = 16
 BEATS    = BARS * 4
-LOOP_DUR = BEATS * 60.0 / BPM          # 53.3333 s
-LOOP_N   = int(round(LOOP_DUR * SR))
+LOOP_N   = int(round(BEATS * 60.0 / BPM * SR))
+# The musical length and the FILE length are not the same number unless the
+# tempo happens to divide evenly into the sample rate — 72 BPM did, 163 does
+# not. Everything that has to line up with the loop point (snap, the LFOs) must
+# use the length the file actually IS, or the phase drifts by a fraction of a
+# sample per loop and the seam slowly opens up.
+LOOP_DUR = LOOP_N / SR                 # 47.117 s at 163 BPM / 32 bars
 BEAT_N   = LOOP_N // int(BEATS)
 OUT      = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'stems')
 os.makedirs(os.path.join(OUT, 'sfx'), exist_ok=True)
@@ -118,43 +128,54 @@ def place(buf, sig, at):
     np.add.at(buf, idx, sig)
 
 # ------------------------------------------------------------ harmony ------
-"""A four-chord progression, four bars each, filling the 16-bar loop.
+"""The written phrase, transcribed from Logic (bars 65-80 at 163 BPM).
 
-   The first version of this score sat on a single F chord for the whole 53
-   seconds. That is what made it read as ambient rather than as music: no
-   harmonic movement and no rhythm, so nothing ever arrived. Motion comes from
-   HARMONY and ARPEGGIATION, not from adding a drum kit — the early floors stay
-   percussion-free on purpose, so the first kick in the game is still the boss.
+   Bass moves every two bars:   F   G   A   A   F   G   D   D
+   with one ostinato figure repeating over all of it:
 
-   COLD vs WARM used to be "no third vs third", and omitting the third
-   everywhere is what made the early game sound eerie rather than quiet — an
-   unresolved chord reads as unease, not as indifference. Both are plain
-   consonant harmony now. The difference is DENSITY and REGISTER: cold is a
-   bare triad sitting high with no low end to lean on, warm is the same chord
-   extended (sixths, sevenths, ninths) with the bass filled in underneath.
-   Sparse and thin still feels lonely; it just no longer feels haunted.
+       |A3 . . E3 . F3 . .|. F3 . . E3 . . .|
 
-   Nothing here uses the Lydian #11 any more. B natural over F is precisely
-   the "mysterious" interval, and it was doing exactly that."""
-PROG = ['F', 'Dm', 'Bb', 'C']                       # 4 bars each
-COLD_VOICING = {                        # plain triads, high, no bass weight
-    'F' : ['F3','A3','C4'],
-    'Dm': ['D3','F3','A3'],
-    'Bb': ['Bb2','D3','F3'],
-    'C' : ['C3','E3','G3'],
-}
-WARM_VOICING = {                        # same chords, extended and grounded
-    'F' : ['F2','A2','C3','E3','G3'],               # Fmaj9
-    'Dm': ['D2','F2','A2','C3','E4'],               # Dm9
-    'Bb': ['Bb1','D3','F3','A3'],                   # Bbmaj7
-    'C' : ['C2','E3','G3','A3','D4'],               # C6/9
-}
-ARP_COLD = {'F':['F3','A3','C4','A3'], 'Dm':['D3','F3','A3','F3'],
-            'Bb':['Bb2','D3','F3','D3'], 'C':['C3','E3','G3','E3']}
-ARP_WARM = {'F':['F3','A3','C4','E4'], 'Dm':['D3','F3','A3','C4'],
-            'Bb':['Bb2','D3','F3','A3'], 'C':['C3','E3','G3','A3']}
+   Every second unit is a variant that strikes A3 twice at the top of the bar
+   instead of holding it once.
 
-CHORD_BEATS = int(BEATS) // len(PROG)               # 16 beats = 4 bars each
+   Roots of i-III-iv-V under a constant A/E/F cell puts this in D MINOR — the
+   relative minor of F, so it shares every note with the one-shots, which were
+   already pitched in F. Nothing had to be re-tuned to fit it.
+
+   COLD and WARM are the SAME MUSIC now, not different harmony: cold plays the
+   ostinato over a single bass octave, thin and high; warm adds the octave
+   below, the thirds and fifths, and a pad underneath. Register and density
+   carry the warmth arc, which is what stopped the early game sounding eerie.
+
+   Added notes avoid Bb entirely — against the ostinato's E natural it makes a
+   tritone, and that is the interval that made the first version creepy."""
+
+UNITS = [('F',False), ('G',True), ('A',False), ('A',True),
+         ('F',False), ('G',True), ('D',False), ('D',True)]
+UNIT_BEATS = 8                                   # two bars per root
+CYCLE_BEATS = len(UNITS) * UNIT_BEATS            # the whole 16-bar phrase
+
+# (beat within the unit, note, length in beats)
+OSTINATO     = [(0,'A3',.85), (1.5,'E3',.85), (3,'F3',.85),
+                (5,'F3',.85), (6.5,'E3',.85)]
+OSTINATO_VAR = [(0,'A3',.5), (1,'A3',.5), (1.5,'E3',.85), (3,'F3',.85),
+                (5,'F3',.85), (6.5,'E3',.85)]
+
+BASS_MID = {'F':'F2', 'G':'G2', 'A':'A2', 'D':'D2'}
+BASS_LOW = {'F':'F1', 'G':'G1', 'A':'A1', 'D':'D1'}
+WARM_ADD = {'F':['A2','C3'], 'G':['D3','G3'], 'A':['E3','C3'], 'D':['A2','F3']}
+
+def ostinato(buf, amp=0.5, bright=2.8, ring=0.45, octave=1):
+    """The figure itself. `octave` lifts it for stems that must sit above the
+       beds without competing with them."""
+    for u,(root,var) in enumerate(UNITS):
+        base = u * UNIT_BEATS
+        for beat, note, ln in (OSTINATO_VAR if var else OSTINATO):
+            dur = ln * 60.0 / BPM + ring
+            a = amp * (1.0 if beat == 0 else 0.72)     # lean on the downbeat
+            place(buf, pluck(hz(note)*octave, dur, amp=a,
+                             harmonics=(1.0,.20,.08,.03), bright=bright),
+                  int((base + beat) * BEAT_N))
 
 def pad_chord(buf, notes, start_beat, len_beats, amp=1.0, harmonics=(1.0,.3,.12,.05),
               attack=0.9, release=2.2):
@@ -172,21 +193,6 @@ def pad_chord(buf, notes, start_beat, len_beats, amp=1.0, harmonics=(1.0,.3,.12,
         for i, a in enumerate(harmonics, start=1):
             sig += a * np.sin(2 * np.pi * f * i * t) / len(notes)
     place(buf, sig * env * amp, int(start_beat * BEAT_N))
-
-def arpeggio(buf, table, amp=0.5, step=0.5, bright=2.6, dur=1.1):
-    """Eighth-note arpeggio across the progression. This is the single thing
-       that stopped the beds feeling like weather and started them feeling like
-       a piece of music — rhythm without a single drum."""
-    per = int(step * BEAT_N)
-    for b in range(int(BEATS / step)):
-        beat = b * step
-        chord = PROG[int(beat // CHORD_BEATS) % len(PROG)]
-        seq = table[chord]
-        note = seq[b % len(seq)]
-        # a gentle swing in emphasis so it breathes instead of machine-gunning
-        a = amp * (1.0 if b % 4 == 0 else 0.62 if b % 2 == 0 else 0.42)
-        place(buf, pluck(hz(note), dur, amp=a,
-                         harmonics=(1.0,.20,.08,.03), bright=bright), b * per)
 
 def hit(seed, dur, cutoff, amp=1.0, hp=None, curve=6.0):
     """Percussive noise burst — kick body, breath, cymbal-ish depending on args."""
@@ -225,28 +231,26 @@ def write(name, sig, peak=0.7):
 # ================================================================ STEMS ====
 
 def bed_cold():
-    """Floors 0-8. A plain major/minor triad, voiced high with no bass under
-       it. Thin and unaccompanied rather than dissonant — the early city is
-       lonely, not haunted. Shallow LFOs: a deep wobble is itself a spooky
-       sound, and it was making the pads breathe like something alive."""
+    """Floors 0-8. The ostinato over one bass octave. Thin and high, with no
+       weight underneath — lonely rather than haunted."""
     x = np.zeros(LOOP_N)
-    for i, chord in enumerate(PROG):
-        pad_chord(x, COLD_VOICING[chord], i*CHORD_BEATS, CHORD_BEATS,
-                  amp=1.0, harmonics=(1.0,.22,.07,.02))
-    arpeggio(x, ARP_COLD, amp=0.30, bright=2.6, dur=1.1)
-    x += noise_loop(11, 2600, hp=700) * 0.012 * lfo(2, .8, 1.0)   # a little air
+    for u,(root,_) in enumerate(UNITS):
+        pad_chord(x, [BASS_MID[root]], u*UNIT_BEATS, UNIT_BEATS,
+                  amp=0.85, harmonics=(1.0,.20,.06))
+    ostinato(x, amp=0.42, bright=2.6, ring=0.35)
+    x += noise_loop(11, 2600, hp=700) * 0.012 * lfo(2, .8, 1.0)
     return x
 
 def bed_warm():
-    """Floors 9-18. Same chords and the same rhythm, so it crossfades with the
-       cold bed — but extended (sixths, sevenths, ninths) and grounded with the
-       bass filled in. Fuller, closer, kinder."""
+    """Floors 9-18. Same phrase, same rhythm, so it crossfades with the cold
+       bed — but the octave below arrives, the thirds fill in, and a pad sits
+       under it. Fuller, closer, kinder."""
     x = np.zeros(LOOP_N)
-    for i, chord in enumerate(PROG):
-        pad_chord(x, WARM_VOICING[chord], i*CHORD_BEATS, CHORD_BEATS,
+    for u,(root,_) in enumerate(UNITS):
+        notes = [BASS_LOW[root], BASS_MID[root]] + WARM_ADD[root]
+        pad_chord(x, notes, u*UNIT_BEATS, UNIT_BEATS,
                   amp=1.0, harmonics=(1.0,.24,.09,.03))
-    arpeggio(x, ARP_WARM, amp=0.38, bright=3.2, dur=1.4)
-    x += sine(hz('A4'), .022) * lfo(4, .5, 1.0, phase=2.6)
+    ostinato(x, amp=0.44, bright=3.2, ring=0.6)
     x += noise_loop(21, 1800, hp=400) * 0.011 * lfo(2, .8, 1.0)
     return x
 
@@ -257,7 +261,7 @@ def pulse():
     for b in range(int(BEATS)):
         at = b * BEAT_N
         body = hit(100 + b, 0.42, 150, amp=0.95, curve=7.0)
-        tone = pluck(hz('F1'), 0.42, amp=0.55, harmonics=(1.0, .30, .10), bright=1.4)
+        tone = pluck(hz('D1'), 0.42, amp=0.55, harmonics=(1.0, .30, .10), bright=1.4)
         place(x, body[:len(tone)] * 0.7 + tone * 0.8, at)
         if b % 4 in (1, 3):                                   # soft breath off-beat
             place(x, hit(500 + b, 0.30, 2600, amp=0.16, hp=700, curve=9.0),
@@ -268,73 +272,57 @@ def pulse():
 def tension():
     """Low HP, or a foe adjacent.
 
-       This was a semitone beat (B against C) plus a tritone — which is not
-       "tense", it is a horror cue, and it was the single creepiest thing in
-       the score. Urgency now comes from RHYTHM: a quick sixteenth-note
-       ostinato on chord tones that quickens the pulse without ever sounding
-       wrong. Same job, no dread.
-
-       Still lives above the beds — the low end is occupied, and a stem that
-       competes for it makes the mix muddy rather than urgent."""
+       The written figure, an octave up and struck on every eighth instead of
+       its own rhythm. Urgency out of DENSITY, using notes that are already in
+       the piece — the earlier version got this from a semitone beat and a
+       tritone, which is a horror cue, not tension."""
     x = np.zeros(LOOP_N)
-    step = 0.25                                     # sixteenths
-    per = int(step * BEAT_N)
-    for b in range(int(BEATS / step)):
-        beat = b * step
-        chord = PROG[int(beat // CHORD_BEATS) % len(PROG)]
-        seq = ARP_WARM[chord]
-        note = seq[b % len(seq)]
-        up = hz(note) * 2                           # an octave above the bed
-        a = 0.5 if b % 4 == 0 else 0.28
-        place(x, pluck(up, 0.5, amp=a, harmonics=(1.0,.14,.05), bright=3.0), b*per)
+    per = int(0.5 * BEAT_N)
+    for b in range(int(BEATS) * 2):
+        beat = b * 0.5
+        u = int(beat // UNIT_BEATS) % len(UNITS)
+        within = beat - (beat // UNIT_BEATS) * UNIT_BEATS
+        cell = ['A3','E3','F3','E3'][b % 4]
+        a = 0.5 if b % 4 == 0 else 0.26
+        place(x, pluck(hz(cell)*2, 0.42, amp=a,
+                       harmonics=(1.0,.14,.05), bright=3.0), b*per)
     return x
 
 def melody():
-    """The pilgrim's theme. Sparse, unhurried, mostly silence — it should feel
-       like something half-remembered rather than a tune being performed."""
+    """The pilgrim's theme: the written figure lifted an octave and given room,
+       so it reads as a line being sung over the phrase rather than a second
+       copy of it."""
     x = np.zeros(LOOP_N)
-    # (beat, note, amp) — a real tune now, following the chords underneath it
-    # rather than drifting over a single one. Still leaves room to breathe, but
-    # something arrives at least every couple of beats.
-    phrase = [
-        # F                                   Dm
-        (0,'F4',.85), (1.5,'A4',.62), (3,'C5',.70), (5,'A4',.55),
-        (6.5,'G4',.60), (8,'F4',.75), (10,'C5',.58), (12,'A4',.66),
-        (14,'G4',.55),
-        (16,'D4',.80), (17.5,'F4',.60), (19,'A4',.72), (21,'C5',.58),
-        (22.5,'A4',.55), (24,'F4',.70), (26,'E4',.60), (28,'D4',.74),
-        (30,'A3',.55),
-        # Bb                                  C
-        (32,'F4',.78), (33.5,'D4',.58), (35,'Bb3',.70), (37,'D4',.60),
-        (38.5,'F4',.64), (40,'A4',.72), (42,'F4',.58), (44,'D4',.66),
-        (46,'Bb3',.60),
-        (48,'C4',.80), (49.5,'E4',.60), (51,'G4',.72), (53,'A4',.62),
-        (54.5,'G4',.55), (56,'E4',.68), (58,'D4',.58), (60,'C4',.76),
-        (62,'F3',.66),
-    ]
-    for beat, note, amp in phrase:
-        n = pluck(hz(note), 3.2, amp=amp, harmonics=(1.0, .30, .14, .06), bright=2.2)
-        place(x, n, int(beat * BEAT_N))
+    for u,(root,var) in enumerate(UNITS):
+        base = u * UNIT_BEATS
+        for beat, note, ln in OSTINATO:
+            if var and beat in (5,):          # thin it out so it breathes
+                continue
+            place(x, pluck(hz(note)*2, ln*60.0/BPM + 0.9, amp=.62 if beat==0 else .44,
+                           harmonics=(1.0,.30,.12,.05), bright=2.6),
+                  int((base+beat)*BEAT_N))
     return x * 0.9
 
 def hearth():
-    """The ramen stall and the shops. Warm, close, no threat. Diegetic-feeling —
-       this is the one place in the game that is on the pilgrim's side."""
+    """The ramen stall and the shops. The same phrase played close and gently —
+       the one place in the game that is on the pilgrim's side."""
     x = np.zeros(LOOP_N)
-    arpeggio(x, ARP_WARM, amp=0.72, step=0.5, bright=3.4, dur=2.0)
-    for i, chord in enumerate(PROG):
-        pad_chord(x, WARM_VOICING[chord][:3], i*CHORD_BEATS, CHORD_BEATS,
-                  amp=0.34, harmonics=(1.0,.18,.06))
-    x += noise_loop(51, 1400, hp=300) * 0.040 * lfo(2, .6, 1.0)   # room tone
+    ostinato(x, amp=0.8, bright=3.6, ring=1.1)
+    for u,(root,_) in enumerate(UNITS):
+        pad_chord(x, [BASS_MID[root]] + WARM_ADD[root], u*UNIT_BEATS, UNIT_BEATS,
+                  amp=0.30, harmonics=(1.0,.18,.06))
+    x += noise_loop(51, 1400, hp=300) * 0.040 * lfo(2, .6, 1.0)
     return x
 
 def boss_bed():
-    """Boss floors. F7 — the Eb darkens it without leaving the key. This is the
-       first time in the game the player hears a kick drum, and that is the point."""
-    x  = stack(hz('F1'), [1.0, .40, .18, .09, .04], detune=.004) * lfo(2, .7, 1.0)
-    x += stack(hz('C3'), [.35, .16, .07], detune=.003) * lfo(3, .5, .95)
-    x += stack(hz('Eb4'), [.20, .08], detune=.002) * lfo(4, .3, .85, phase=1.4)
-    x += stack(hz('F3'), [.28, .10], detune=.003) * lfo(5, .4, .9, phase=2.6)
+    """Boss floors. D minor, low and heavy — the first time in the game the
+       player hears a kick drum, and that is the point. Rooted on D like the
+       rest of the score; the earlier Eb sat a semitone above the tonic, which
+       is the exact interval we took out everywhere else."""
+    x  = stack(hz('D1'), [1.0, .40, .18, .09, .04], detune=.004) * lfo(2, .7, 1.0)
+    x += stack(hz('A2'), [.35, .16, .07], detune=.003) * lfo(3, .5, .95)
+    x += stack(hz('F3'), [.26, .10], detune=.003) * lfo(5, .4, .9, phase=2.6)
+    x += stack(hz('D3'), [.20, .08], detune=.002) * lfo(4, .3, .85, phase=1.4)
     for b in range(int(BEATS)):
         if b % 4 in (0, 2):
             place(x, hit(700 + b, 0.55, 110, amp=0.85, curve=6.0), b * BEAT_N)
@@ -344,15 +332,15 @@ def boss_bed():
 def boss_press():
     """Layers on when the boss drops below half. Faster, higher, less air."""
     x = np.zeros(LOOP_N)
-    for b in range(int(BEATS) * 2):                            # eighth notes
-        at = b * BEAT_N // 2
+    for b in range(int(BEATS)):                                # quarters at 163
+        at = b * BEAT_N
         place(x, hit(900 + b, 0.16, 5200, amp=0.30, hp=1800, curve=22.0), at)
     for b in range(int(BEATS)):
         if b % 2 == 1:
             place(x, hit(1300 + b, 0.34, 200, amp=0.55, curve=8.0), b * BEAT_N)
-    x += stack(hz('F4'), [.16, .07], detune=.004) * lfo(8, .2, 1.0)
-    x += stack(hz('Eb5'), [.10, .04], detune=.003) * lfo(12, .1, 1.0, phase=1.0)
-    x += sine(hz('C5'), .09) * lfo(16, .0, 1.0, phase=2.2)
+    x += stack(hz('D4'), [.16, .07], detune=.004) * lfo(8, .2, 1.0)
+    x += stack(hz('A4'), [.10, .04], detune=.003) * lfo(12, .1, 1.0, phase=1.0)
+    x += sine(hz('F5'), .09) * lfo(16, .0, 1.0, phase=2.2)
     return x
 
 # ============================================================== ONE-SHOTS ==
