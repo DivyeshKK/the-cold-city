@@ -1546,11 +1546,11 @@ const ENEMY_INFO={
   agent180:{order:4,html:
     `<span class="h">Agent 180</span> (boss) — <span class="k">${KINDS.agent180.bd} damage</span> physical, fixed. `+
     `<b>Normal shot:</b> fires beyond 1 tile with a clear line, then reloads for a turn before it can fire again, same as a Sniper. `+
-    `<b>Telegraph:</b> every 3rd round it blinks onto a row with no walls in it and lights the entire row instead of taking a normal shot. `+
+    `<b>Telegraph:</b> every 3rd round it lights up the whole of the nearest row with no walls in it, instead of taking a normal shot, and walks onto that row a tile at a time. `+
     `<b>Fires:</b> the following round — anyone anywhere along that lit row is hit, not just the tile it marked when lighting it; a row with nobody on it does nothing. `+
     `<b>Avoid it:</b> the moment a row lights up, move off that row (any other row is safe) before its next turn. `+
     `<b>Moves:</b> otherwise always retreats — 1 tile most turns, 2 tiles every other turn. `+
-    `<b>Special:</b> any hit that doesn't kill it teleports it elsewhere in the room. `+
+    `<b>Special:</b> any hit that doesn't kill it teleports it elsewhere in the room — the only time it moves without walking. `+
     `Fought in the dark — while it's alive, your own attack range is capped to the lit 5×5 patch around you. `+
     `<b>Walls:</b> a walled row can never be the one it lights, but once a row is chosen nothing on it blocks the beam.`},
   lance:{order:5,html:
@@ -2915,32 +2915,66 @@ function stepAwayFrom(e,h){
    only see two tiles, this is the one attack you can see coming — and the
    lit row is also the only time you're told where it is standing. */
 function agent180Line(e){
-  const h=S.hero;
-  // fire down its own row if that row is clear of walls; otherwise take one
+  // fire down its own row if that row is clear of walls; otherwise take the
+  // NEAREST clear one. It has to walk there now, so a random row across the
+  // arena would be a march rather than a reposition.
   const rowClear=r=>{ for(let c=0;c<COLS;c++) if(isWall(c,r)) return false; return true; };
   let r = rowClear(e.row) ? e.row : null;
   if(r===null){
-    const open=[]; for(let rr=0;rr<ROWS;rr++) if(rowClear(rr)) open.push(rr);
-    if(!open.length) return false;
-    r = open[Math.floor(Math.random()*open.length)];
+    let bd=Infinity;
+    for(let rr=0;rr<ROWS;rr++){
+      if(!rowClear(rr)) continue;
+      const d=Math.abs(rr-e.row);
+      if(d<bd){ bd=d; r=rr; }
+    }
+    if(r===null) return false;
   }
-  // stand on the row it is about to rake, so the shot has a visible source
-  const spots=[];
-  for(let c=0;c<COLS;c++) if(!isWall(c,r)&&!occupied(c,r,e)) spots.push(c);
-  if(spots.length){
-    let best=spots[0], bd=-1;
-    for(const c of spots){ const d=Math.abs(c-h.col); if(d>bd){ bd=d; best=c; } }
-    agent180BlinkTo(e,best,r);
+  // Stand on the row it is about to rake, so the shot has a visible source.
+  // Hold its column if that tile is free, so the walk is the short way there.
+  let tc=e.col;
+  if(isWall(tc,r)||occupied(tc,r,e)){
+    let bd=Infinity;
+    for(let c=0;c<COLS;c++){
+      if(isWall(c,r)||occupied(c,r,e)) continue;
+      const d=Math.abs(c-e.col);
+      if(d<bd){ bd=d; tc=c; }
+    }
+    if(bd===Infinity) return false;
   }
+  agent180WalkTo(e,tc,r);
   e.marks=[]; for(let c=0;c<COLS;c++) if(!isWall(c,r)) e.marks.push([c,r]);
   e.lineRow=r; e.phase='fire';
   say('agent 180 lights a lane. get off that row.');
   return true;
 }
-function agent180BlinkTo(e,c,r){
-  addFx({type:'ring',col:e.col,row:e.row,col2:'rgba(63,224,122,.9)',dur:340});
-  e.col=c; e.row=r; e.vx=c; e.vy=r;            // a blink, not a glide
-  addFx({type:'ring',col:c,row:r,col2:'rgba(63,224,122,.9)',dur:340});
+/* Walks it into the firing position a tile at a time rather than dropping it
+   there. In a room lit two tiles wide the steps are mostly sound and ripples
+   on the floor, which is the point: it is somewhere, and it is coming. Only a
+   landed hit still throws it across the arena — see agent180Teleport. */
+function agent180WalkTo(e,tc,tr){
+  const path=[];
+  let c=e.col, r=e.row, guard=0;
+  while((c!==tc||r!==tr) && guard++<60){
+    const dc=Math.sign(tc-c), dr=Math.sign(tr-r);
+    // close the longer axis first, and fall back to the other when blocked
+    const tries = Math.abs(tc-c)>=Math.abs(tr-r) ? [[dc,0],[0,dr]] : [[0,dr],[dc,0]];
+    let moved=false;
+    for(const [mc,mr] of tries){
+      if(!mc&&!mr) continue;
+      if(!passable(c+mc,r+mr,e)) continue;
+      c+=mc; r+=mr; path.push([c,r]); moved=true; break;
+    }
+    if(!moved) break;                          // walled in — fire from where it stands
+  }
+  if(!path.length) return;
+  let i=0;
+  (function step(){
+    if(S.over||!e.alive) return;
+    const [nc,nr]=path[i++];
+    addFx({type:'ring',col:e.col,row:e.row,col2:'rgba(63,224,122,.45)',dur:240});
+    e.col=nc; e.row=nr;                        // vx/vy left alone, so it glides
+    if(i<path.length) setTimeout(step,130);
+  })();
 }
 function agent180Act(e){
   const h=S.hero;
@@ -2966,12 +3000,11 @@ function agent180Act(e){
   for(let i=0;i<steps;i++){ if(!stepAwayFrom(e,h)) break; }
   // In a room you can only see two tiles across, a silent reposition reads as
   // the thing teleporting at random. Ring the ground it left and the ground
-  // it took, so the move is legible even when the body isn't.
+  // it took, so the move is legible even when the body isn't. It walks the
+  // gap, though — only a landed hit throws it (agent180Teleport).
   if(from[0]!==e.col||from[1]!==e.row){
     addFx({type:'ring',col:from[0],row:from[1],col2:'rgba(63,224,122,.75)',dur:420});
     addFx({type:'ring',col:e.col,   row:e.row,   col2:'rgba(63,224,122,.9)', dur:420});
-    e.vx=e.col; e.vy=e.row;                    // a blink, not a glide
-    e.blinkAt=performance.now();
   }
   if(cheb(e,h)>1 && losClear(e,h)){
     if(e.spent){ e.spent=false; return; }       // reloading — your window to close
@@ -4336,6 +4369,11 @@ function win(){
    board turned portrait (it was 12x6 landscape before that); every build
    since is 2.x. Each entry is [number, date, [lines]] — add to the top. */
 const VERSIONS=[
+  ['2.8.2','14 Aug 2026',[
+    'Agent 180 only teleports when you land a hit on it — every other move is a walk',
+    'It walks onto the row it lights a tile at a time, instead of appearing on it',
+    'The lane it picks is the nearest clear row, not one across the arena',
+  ]],
   ['2.8.1','14 Aug 2026',[
     'An opening: three pages of text on black before the first floor',
     'The lines stack up two seconds apart, and a click turns the page',
