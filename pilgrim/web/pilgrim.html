@@ -238,7 +238,7 @@
      has to be hidden until then, or it shows through the gradient. */
   .wrap.titling .hud, .wrap.titling #bubbles, .wrap.titling .slotBar,
   .wrap.titling .bar, .wrap.titling details, .wrap.titling .titlebar,
-  .wrap.titling .guideCallout{display:none}
+  .wrap.titling .guideCallout, .wrap.titling .playSide{display:none}
   /* The title owns the whole page. The stage breaks out of its phone-shaped
      frame and the skyline is scaled to COVER the viewport (cropping the
      overflow) rather than fit inside it, so there are no bars down the
@@ -520,6 +520,11 @@
   button.skip:hover{border-color:var(--cyan);color:#fff}
 
   .bar{display:flex;flex-direction:column;gap:8px;align-items:center;margin-top:12px}
+  /* Stacked by default — .play is transparent to layout and everything falls
+     down the page in source order, exactly as it did before the split. The
+     landscape rule further down is the only thing that turns it into a row. */
+  .play{display:block}
+  .playSide{display:block}
   /* The four run buttons sit as one block the width of the board, rather than
      drifting to opposite ends of the page — the slot bar above them is the
      same width, so the whole lower half reads as one panel. */
@@ -678,12 +683,68 @@
        (#gameGuide.nag) carries the same "look here" signal on its own. */
     .guideCallout{display:none}
   }
+
+  /* ---- wide windows: the controls move beside the board ----
+     A landscape window is short and wide, which is the worst case for a
+     column layout — the board is squeezed by the height the controls eat,
+     while the width sits unused. So put the controls in a side column and
+     let the board have the height back.
+
+     Gated on WIDTH ALONE, deliberately, not on orientation. A window can be
+     portrait by the strict h>w test and still be far wider than the board
+     needs — 900x1000, say — and an orientation test would stack those and
+     waste the same space this rule exists to reclaim. "Do they fit beside
+     it" is a question about width, so that is what gets asked. 740 is the
+     board at its 405 cap, plus the widest the column gets, plus the gap and
+     the wrap's padding. Below it the query stops matching and everything
+     falls back down the page on its own — the stacked layout is the default,
+     not a second copy of the rules.
+
+     --chrome drops to 150 because in this mode only the titlebar, the slot
+     bar and the strike row are above and below the board; the button grid
+     and Game Guide have left the column entirely. That is what lets the
+     board grow into a short landscape window instead of staying letterboxed
+     at the portrait size. Verified against documentElement.scrollHeight at
+     900x520, 1024x600, 1280x720 and 1440x900. */
+  @media (min-width:740px){
+    :root{--chrome:100px}
+    .wrap{padding:12px 16px 16px}
+    .titlebar{margin-bottom:6px}
+    .titlebar h1{font-size:19px;letter-spacing:.18em}
+    .bar{margin-top:8px}
+    .play{display:flex;align-items:flex-start;justify-content:center;gap:20px}
+    /* The board sizes itself with min(100%, ...), and as a bare flex item its
+       100% resolved against a column that had shrunk to fit the board — each
+       waiting on the other, which bottomed out at a 106px board. Give the
+       column the board's own height-derived width as its flex-basis so the
+       100% has something real underneath it; shrink stays enabled so a narrow
+       landscape window still squeezes it rather than overflowing. */
+    .playMain{flex:0 1 min(405px, calc((100dvh - var(--chrome)) * 0.5));min-width:0}
+    .playSide{flex:0 0 clamp(230px,24vw,290px);
+      display:flex;flex-direction:column;gap:10px;
+      /* line the controls up with the top of the board, not the page */
+      margin-top:0}
+    /* In the column these matched the board's width formula so the lower half
+       read as one panel. Beside it they simply fill their own column. */
+    .playSide .btnGrid{width:100%;margin:0}
+    .playSide details{width:100%;margin:0}
+    .playSide .guideCallout{margin:0}
+    /* the guide can get long — keep it inside the window rather than pushing
+       the page taller than the board it sits next to */
+    .playSide .rules{max-height:calc(100dvh - 260px);overflow-y:auto}
+  }
 </style>
 
 <div class="wrap titling" id="wrap">
   <div class="titlebar">
     <h1>The Cold City</h1>
   </div>
+
+  <!-- Board and controls. Stacked by default; side by side once a landscape
+       window is wide enough to seat the controls beside the board (see the
+       .play flex rules). -->
+  <div class="play" id="play">
+  <div class="playMain">
 
   <div class="stageWrap" id="stageWrap">
   <div class="stage" id="stage">
@@ -816,13 +877,18 @@
 
   <div class="bar">
     <span id="strikeBtns" class="strikeRow"></span>
+  </div>
+
+  </div><!-- /.playMain -->
+
+  <!-- The run controls. Under the board in portrait, beside it in landscape. -->
+  <div class="playSide">
     <div class="btnGrid">
       <button id="btnEnd">End Turn ␣</button>
       <button id="btnStatus" title="View your equipment and passive skills">Loadout</button>
         <button id="btnSalvage" title="Select a carried item first">Salvage</button>
       <button id="btnRestart">Restart Run</button>
     </div>
-  </div>
 
   <div class="guideCallout" id="guideCallout">
     <span class="arrow">↓</span> Need help? Open <b>GAME GUIDE</b> to review rules, controls,
@@ -861,6 +927,8 @@
       <span class="k">R</span> restart.
     </div>
   </details>
+  </div><!-- /.playSide -->
+  </div><!-- /.play -->
 </div>
 
 <script>
@@ -4369,6 +4437,11 @@ function win(){
    board turned portrait (it was 12x6 landscape before that); every build
    since is 2.x. Each entry is [number, date, [lines]] — add to the top. */
 const VERSIONS=[
+  ['2.9.0','14 Aug 2026',[
+    'On a wide screen the run buttons and the Game Guide sit beside the board instead of under it',
+    'The board grows to fill the height it gets back — full size on a tablet',
+    'Narrow the window and the controls drop back underneath, as before',
+  ]],
   ['2.8.2','14 Aug 2026',[
     'Agent 180 only teleports when you land a hit on it — every other move is a walk',
     'It walks onto the row it lights a tile at a time, instead of appearing on it',
