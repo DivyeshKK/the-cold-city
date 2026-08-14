@@ -888,6 +888,7 @@
       <button id="btnStatus" title="View your equipment and passive skills">Loadout</button>
         <button id="btnSalvage" title="Select a carried item first">Salvage</button>
       <button id="btnRestart">Restart Run</button>
+      <button id="btnMute" title="Mute the score (M)">♪ Sound</button>
     </div>
 
   <div class="guideCallout" id="guideCallout">
@@ -2677,6 +2678,7 @@ function playerStep(c,r){
   if(!S.reach.has(key(c,r))) return;
   if(c!==h.col) h.face = c<h.col ? 'left' : 'right';   // she turns as she walks
   h.col=c; h.row=r; h.moved=true;
+  if(SCORE) SCORE.sfx('step',0.5);          // quiet: this fires hundreds of times
   if(S.shrines.has(key(c,r))) takeShrine(key(c,r));
   if(S.goal && c===S.goal[0] && r===S.goal[1] && exitIsOpen()){
     addFx({type:'ring',col:c,row:r,col2:'rgba(240,201,135,.9)'});
@@ -2700,6 +2702,7 @@ function playerStrike(e,type){
     h.mp-=cost; spendUse('arcane_bolt');
   }
   h.struck=true;
+  if(SCORE) SCORE.sfx('strike', magic?0.5:0.7);
   const dist=chebToUnit(h,e);
   // an arrow loosed from more than a tile off lands soft — full force only up close
   const rangePenalty = (!magic && dist>1) ? 0.5 : 1;
@@ -2825,6 +2828,9 @@ function heal(n,src){
 }
 function hurtHero(n,src,type,from){
   const h=S.hero;
+  // Each attacker speaks in its own voice as it lands. One hook here covers
+  // every enemy rather than five, because `from` is the foe that swung.
+  if(SCORE && from) SCORE.voice(from);
   if(h.dodge){ h.dodge=false; say(`you slip aside — the ${src} finds nothing.`);
     addFx({type:'ring',col:h.col,row:h.row,col2:'#54dbd6'}); return; }
   if(type==='magic' && h.barrier){
@@ -2844,6 +2850,7 @@ function hurtHero(n,src,type,from){
   // it with every foe in the room at the end of the round
   if(h.returnFire && n>0) h.reflectPool=(h.reflectPool||0)+n;
   h.flash=performance.now(); shake(2+n);
+  if(n>0 && SCORE) SCORE.sfx('hurt',0.8);     // only when a blow actually lands
   if(n>0) addFx({type:'num',col:h.col,row:h.row,txt:'-'+n,col2:'#ff5c6a'});
   addFx({type:'flash'});
   if(h.hp<=0){ updateHud(); gameOver(); }
@@ -3361,6 +3368,7 @@ function takeShrine(k){
   S.shrines.delete(k);
   const [col,row]=k.split(',').map(Number);
   addFx({type:'ring',col,row,col2:'#f0c987'});
+  if(SCORE) SCORE.sfx('shrine',0.7);
   if(tut) tut.tookShrine=true;
   let gain;
   if(S.hero.consumables.length>=MAX_ITEMS && canSalvage(id)){
@@ -3408,6 +3416,7 @@ function clearFloor(reason){
     S.exitOpen=true;
     S.exitAnim={t:performance.now(),shaken:false};   // plays once, then settles open
     say('the way out opens.');
+    if(SCORE) SCORE.sfx('clear',0.55);
     updateHud();
     tutorialCheck();     // the gate beat waits on exitIsOpen() — this IS its moment
   },1000);
@@ -4418,6 +4427,9 @@ function gameOver(){
   // them had a frame to read. Freeze the run now; let the blow land first.
   const gen=S.gen;
   S.over='loss'; S.phase='over'; updateHud();
+  // The sound goes with the BLOW, not with the curtain 650ms later — it is
+  // part of the hit landing, the same beat as the flash and the shake.
+  if(SCORE) SCORE.sfx('death',0.8);
   setTimeout(()=>{
     if(gen!==S.gen) return;                  // a fresh run started in the meantime
     say('you fall. the city does not notice.');
@@ -4426,6 +4438,7 @@ function gameOver(){
 }
 function win(){
   S.over='win'; S.phase='over'; updateHud();
+  if(SCORE) SCORE.sfx('win',0.85);
   say('the lance goes quiet. the district exhales.');
   // the room comes apart before the light takes it — a run of shakes, then
   // the whiteout, so the ending arrives after the violence rather than on it
@@ -4978,6 +4991,8 @@ function updateHud(){
     zone.textContent = S.over? '' : (fighting? 'IN COMBAT' : 'SAFE');
     zone.className='zone'+(fighting?' hot':'');
   }
+  // the score re-reads the world here; every state change already lands in updateHud
+  if(SCORE) SCORE.mix();
 
   const playing = S.phase==='player'&&!S.over;
   // An attack offer is the moment the game is waiting on you, so it gets a
@@ -6144,6 +6159,13 @@ cv.addEventListener('click',ev=>{
   playerStep(t.col,t.row);
 });
 document.getElementById('curtain').addEventListener('click',restart);
+/* The score can't start until the player has interacted — browser policy. The
+   opening scene already advances on a click or space, so the first thing they
+   do boots the audio, and it never has to be asked for. */
+for(const ev of ['pointerdown','keydown']){
+  window.addEventListener(ev, ()=>{ if(SCORE) SCORE.unlock(); }, {once:true});
+}
+document.getElementById('btnMute').onclick=()=>{ SCORE.unlock(); SCORE.setOn(!SCORE.isOn()); };
 document.getElementById('btnEnd').onclick=endTurn;
 document.getElementById('btnStatus').onclick=openStatusPanel;
 document.getElementById('btnSalvage').onclick=ev=>{ ev.stopPropagation(); toggleSalvage(); };
@@ -6171,6 +6193,7 @@ window.addEventListener('keydown',ev=>{
   const k=ev.key.toLowerCase();
   if(titleMode) return;                       // the title screen takes no keys
   if(k==='r'){ restart(); return; }
+  if(k==='m'){ SCORE.unlock(); SCORE.setOn(!SCORE.isOn()); return; }   // mute, anywhere
   // the opening scene advances on space, as the script calls for
   if(document.getElementById('scene').className.includes('show')){
     if(k===' '||k==='enter'){ ev.preventDefault(); advanceScene(); }
@@ -6368,8 +6391,145 @@ cancelAnimationFrame(raf); raf=requestAnimationFrame(frame);
 
 /* Dev/playtest hooks — handy for demoing a specific floor or tuning numbers:
    __game.jump(6) loads the boss floor; __game.give('bow') grants a skill. */
+/* ============================ THE SCORE ============================
+   Eight loops, one clock. Every stem is 72 BPM / 16 bars in F (tools/stems.py),
+   they all start on the same instant and are never stopped or restarted — game
+   state only ramps their GAINS. That is what makes this safe in a turn-based
+   game: phase flips constantly, and a gain ramp can happen on any frame without
+   a seam, where re-sequencing whole tracks would glitch or arrive late.
+
+   The stems are bounced at mix level, not normalised, so any combination plays
+   at unity without clipping (measured: 0.56-0.73 peak) and needs no limiter.
+
+   The warmth arc is the score's whole argument: floors 0-5 have no third in the
+   harmony and no percussion at all, so the first kick drum in the game is the
+   Warden. A missing file just means that layer is silent — the game runs fine
+   with the audio/ folder deleted. */
+/* `var`, not `const`: updateHud() calls into this during boot, before this line
+   has run. A hoisted var reads as undefined and the guard skips it; a const
+   would be in the temporal dead zone and throw. */
+var SCORE=(()=>{
+  const LOOPS=['bed_cold','bed_warm','pulse','tension','melody','hearth',
+               'boss_bed','boss_press'];
+  const ONESHOTS=['shrine','clear','death','win',
+                  'goon','sniper','mortar','warden','agent','lance',
+                  'step','strike','hurt'];
+  /* One voice per character, built from what that character DOES: the goon's
+     footfall, the sniper's shot travelling away, the mortar falling, the
+     warden's plate refusing to break, the Agent's quantised square wave, the
+     Lance's sub. All pitched inside F so a hit lands in tune with the score
+     rather than fighting it. Keyed by display name, which is what survives
+     the roster being re-cut. */
+  const VOICE={ 'goon':'goon', 'sniper':'sniper', 'mortar':'mortar',
+                'warden':'warden', 'agent 180':'agent', 'the lance':'lance' };
+  const FADE=0.55;                       // gain ramps read as weather, not switches
+  let ctx=null, master=null, gains={}, buf={}, live=false, on=true, loading=null;
+
+  try{ on = localStorage.getItem('coldcity.sound') !== 'off'; }catch(e){}
+
+  async function grab(path,key){
+    try{
+      const r = await fetch(path); if(!r.ok) return;
+      buf[key] = await ctx.decodeAudioData(await r.arrayBuffer());
+    }catch(e){}                          // silent layer beats a broken game
+  }
+  function load(){
+    if(loading) return loading;
+    return loading = Promise.all([
+      ...LOOPS.map(n=>grab('audio/'+n+'.m4a', n)),
+      ...ONESHOTS.map(n=>grab('audio/sfx/'+n+'.m4a', 'sfx_'+n)),
+    ]);
+  }
+  /* Browsers refuse to make sound until the player has interacted, so the score
+     boots off the first click or key — which is the opening scene's own advance. */
+  async function unlock(){
+    if(ctx) { if(ctx.state==='suspended') ctx.resume(); return; }
+    const AC = window.AudioContext||window.webkitAudioContext; if(!AC) return;
+    ctx = new AC();
+    master = ctx.createGain(); master.gain.value = on?1:0; master.connect(ctx.destination);
+    await load();
+    const t0 = ctx.currentTime + 0.12;   // one lead-in, shared, so stems stay locked
+    for(const n of LOOPS){
+      if(!buf[n]) continue;
+      const g = ctx.createGain(); g.gain.value = 0; g.connect(master);
+      const s = ctx.createBufferSource();
+      s.buffer = buf[n]; s.loop = true; s.connect(g); s.start(t0);
+      gains[n] = g;
+    }
+    live = true; mix();
+  }
+  function set(name,v){
+    const g = gains[name]; if(!g) return;
+    g.gain.setTargetAtTime(v, ctx.currentTime, FADE/3);
+  }
+  /* Read the world and decide what should be audible. Called from updateHud, so
+     it re-evaluates on every state change; setting a gain to what it already is
+     costs nothing, which is why this can be dumb and total rather than event-driven. */
+  function mix(){
+    if(!live || !S) return;
+    const F      = FLOORS[S.floor] || {};
+    const foes   = S.enemies ? S.enemies.filter(e=>e.alive) : [];
+    const boss   = foes.find(e=>e.boss);
+    // npcRoom is the flag every quiet room sets; npcKinds is optional and THE
+    // SHOPKEEP has none, so keying off it left the first shop scored as combat
+    const npcRoom= !!F.npcRoom && foes.length===0;
+    const onBoss = !!boss;
+    const combat = foes.length>0;
+    /* "a world that slowly warms", stretched over the whole 19 floors: fully
+       cold through floor 4, the third half in by floor 10, fully warm at 16.
+       Keyed off floor index so it survives the team re-cutting the level list. */
+    const warm   = Math.max(0, Math.min(1, (S.floor-4)/12));
+    const hurt   = S.hero && S.hero.hp <= Math.max(2, Math.ceil(maxHp()*0.3));
+    const near   = combat && foes.some(e=>cheb(S.hero,e)<=2);
+
+    set('bed_cold',   onBoss||npcRoom ? 0 : 1-warm);
+    set('bed_warm',   onBoss||npcRoom ? 0 : warm);
+    set('hearth',     npcRoom ? 1 : 0);
+    set('boss_bed',   onBoss ? 1 : 0);
+    set('boss_press', onBoss && boss.hp/boss.maxHp < 0.5 ? 1 : 0);
+    set('pulse',      combat && S.phase==='enemy' ? 1 : 0);
+    set('tension',    combat && (hurt||near) ? 1 : 0);
+    // the pilgrim's theme belongs to the quiet: floor 0, and every cleared room
+    set('melody',     !combat && !npcRoom && !S.over ? 1 : 0);
+  }
+  function sfx(name,vol=1){
+    const b = buf['sfx_'+name]; if(!live||!b) return;
+    const g = ctx.createGain(); g.gain.value = vol; g.connect(master);
+    const s = ctx.createBufferSource(); s.buffer = b; s.connect(g); s.start();
+  }
+  /* A foe's voice. Bosses get more room; a goon three tiles away should not be
+     as loud as the Lance. An unrecognised name is simply silent rather than
+     borrowing someone else's sound. */
+  function voice(e,vol){
+    if(!e||!e.name) return;
+    const key=VOICE[String(e.name).toLowerCase()];
+    if(key) sfx(key, vol!=null?vol : (e.boss?0.85:0.6));
+  }
+  function setOn(v){
+    on = v;
+    try{ localStorage.setItem('coldcity.sound', on?'on':'off'); }catch(e){}
+    if(master) master.gain.setTargetAtTime(on?1:0, ctx.currentTime, 0.08);
+    const b=document.getElementById('btnMute');
+    if(b){ b.textContent = on?'♪ Sound':'♪ Muted'; b.style.opacity = on?'':'0.55'; }
+  }
+  /* rAF stops in a hidden tab but audio does NOT — without this the score plays
+     on over a frozen game. Same class of bug as the turn watchdog. */
+  document.addEventListener('visibilitychange',()=>{
+    if(!ctx) return;
+    if(document.hidden) ctx.suspend(); else if(on) ctx.resume();
+  });
+  return { unlock, mix, sfx, voice, setOn, isOn:()=>on, get ready(){return live},
+    /* Live stem levels — lets a test assert that a state actually reaches the
+       mix, the same way __game.geom and __game.tut make the board and the
+       tutorial checkable from outside. */
+    get levels(){ const o={}; for(const k in gains) o[k]=+gains[k].gain.value.toFixed(3);
+                  return o; },
+    get ctx(){ return ctx; }, get bus(){ return master; } };
+})();
+SCORE.setOn(SCORE.isOn());     // paint the button from the remembered choice
+
 window.__game={ get S(){return S}, calcDamage, heroProfile, mods, armourCut, sightCap,
-  computeAttackable, SKILLS, KINDS, FLOORS,
+  computeAttackable, SKILLS, KINDS, FLOORS, SCORE,
   SPR, IMG, POOLS, openDraft, frame, drawBoard, drawTokens, drawFx,
   noteTrouble,
   /* Live board geometry. TILE/COLS/ROWS/BX/BY are re-set per level by
