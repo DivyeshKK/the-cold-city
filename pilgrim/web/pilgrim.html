@@ -4451,8 +4451,9 @@ function win(){
    since is 2.x. Each entry is [number, date, [lines]] — add to the top. */
 const VERSIONS=[
   ['2.10.0','14 Aug 2026',[
-    'The game has music — eight layers on one clock, fading in and out with what is happening rather than a track that just plays',
+    'The game has music — seven layers on one clock, fading in and out with what is happening rather than a track that just plays',
     'Percussion means trouble: a kick when the city takes its turn, more when you are hurt or cornered, the whole kit for a boss',
+    'The shops, the Mechanic and the ramen stall are silent — quiet is the reward for reaching somewhere safe',
     'The score is the written phrase at 163 BPM, in D minor',
     'Every character has a sound built from what it does — the sniper’s shot travelling away, the mortar landing where you were, the Agent the only inorganic voice in the game',
     'Mute on the button or the M key, and it remembers',
@@ -6417,8 +6418,13 @@ cancelAnimationFrame(raf); raf=requestAnimationFrame(frame);
    has run. A hoisted var reads as undefined and the guard skips it; a const
    would be in the temporal dead zone and throw. */
 var SCORE=(()=>{
-  const LOOPS=['bed_cold','bed_warm','pulse','tension','melody','hearth',
+  const LOOPS=['bed_cold','bed_warm','pulse','tension','melody',
                'boss_bed','boss_press'];
+  /* Roll the low end off everything. The pad and the kick play continuously, and
+     their bottom octave was building up into mud under the sound effects rather
+     than reading as weight. Gentle (12 dB/oct) and high enough to clear the
+     rumble without hollowing out the kick — SCORE.hp(freq) retunes it live. */
+  const HP_HZ = 120;
   const ONESHOTS=['shrine','clear','death','win',
                   'goon','sniper','mortar','warden','agent','lance',
                   'step','strike','hurt'];
@@ -6431,7 +6437,8 @@ var SCORE=(()=>{
   const VOICE={ 'goon':'goon', 'sniper':'sniper', 'mortar':'mortar',
                 'warden':'warden', 'agent 180':'agent', 'the lance':'lance' };
   const FADE=0.55;                       // gain ramps read as weather, not switches
-  let ctx=null, master=null, gains={}, buf={}, live=false, on=true, loading=null;
+  let ctx=null, master=null, highpass=null, gains={}, buf={}, live=false,
+      on=true, loading=null;
 
   try{ on = localStorage.getItem('coldcity.sound') !== 'off'; }catch(e){}
 
@@ -6454,7 +6461,10 @@ var SCORE=(()=>{
     if(ctx) { if(ctx.state==='suspended') ctx.resume(); return; }
     const AC = window.AudioContext||window.webkitAudioContext; if(!AC) return;
     ctx = new AC();
-    master = ctx.createGain(); master.gain.value = on?1:0; master.connect(ctx.destination);
+    master = ctx.createGain(); master.gain.value = on?1:0;
+    highpass = ctx.createBiquadFilter();
+    highpass.type='highpass'; highpass.frequency.value=HP_HZ; highpass.Q.value=0.707;
+    master.connect(highpass); highpass.connect(ctx.destination);
     await load();
     const t0 = ctx.currentTime + 0.12;   // one lead-in, shared, so stems stay locked
     for(const n of LOOPS){
@@ -6490,15 +6500,18 @@ var SCORE=(()=>{
     const hurt   = S.hero && S.hero.hp <= Math.max(2, Math.ceil(maxHp()*0.3));
     const near   = combat && foes.some(e=>cheb(S.hero,e)<=2);
 
-    set('bed_cold',   onBoss||npcRoom ? 0 : 1-warm);
-    set('bed_warm',   onBoss||npcRoom ? 0 : warm);
-    set('hearth',     npcRoom ? 1 : 0);
+    /* The shops, the Mechanic and the ramen stall play NOTHING. Silence is the
+       reward for reaching somewhere safe, and it makes the score arriving on
+       the next floor land as an event rather than as wallpaper. */
+    if(npcRoom){ for(const n of LOOPS) set(n, 0); return; }
+    set('bed_cold',   onBoss ? 0 : 1-warm);
+    set('bed_warm',   onBoss ? 0 : warm);
     set('boss_bed',   onBoss ? 1 : 0);
     set('boss_press', onBoss && boss.hp/boss.maxHp < 0.5 ? 1 : 0);
     set('pulse',      combat && S.phase==='enemy' ? 1 : 0);
     set('tension',    combat && (hurt||near) ? 1 : 0);
     // the pilgrim's theme belongs to the quiet: floor 0, and every cleared room
-    set('melody',     !combat && !npcRoom && !S.over ? 1 : 0);
+    set('melody',     !combat && !S.over ? 1 : 0);
   }
   function sfx(name,vol=1){
     const b = buf['sfx_'+name]; if(!live||!b) return;
@@ -6532,7 +6545,14 @@ var SCORE=(()=>{
        tutorial checkable from outside. */
     get levels(){ const o={}; for(const k in gains) o[k]=+gains[k].gain.value.toFixed(3);
                   return o; },
-    get ctx(){ return ctx; }, get bus(){ return master; } };
+    get ctx(){ return ctx; }, get bus(){ return master; },
+    get out(){ return highpass || master; },
+    /* Read the corner with no argument, retune it with one. Live, so the
+       cutoff can be dialled in against the actual game rather than guessed. */
+    hp(freq){ if(!highpass) return null;
+              if(Number.isFinite(freq))
+                highpass.frequency.setTargetAtTime(freq, ctx.currentTime, .05);
+              return highpass.frequency.value; } };
 })();
 SCORE.setOn(SCORE.isOn());     // paint the button from the remembered choice
 

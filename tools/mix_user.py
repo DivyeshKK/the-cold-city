@@ -9,11 +9,14 @@ ASSEMBLES ITSELF as the player gets deeper into trouble:
 
     exploring        pad
     the city acts    + kick
-    hurt / cornered  + tambourine, trance topper
+    hurt / cornered  + tambourine
     a boss           + snare, perc slam, the whole kit
 
 That keeps the rule the score has followed from the start — percussion means
 threat — while using the real material rather than anything synthesised.
+
+The shops and the NPC rooms play NOTHING. Silence is the reward for reaching
+somewhere safe, and it makes the music arriving on the next floor land.
 
 Source levels are wildly different (kick is ~11 dB hotter than the pads), so
 every source gets a gain here, and every finished stem is normalised to a
@@ -30,7 +33,6 @@ os.makedirs(OUT, exist_ok=True)
 FILES = {
     'pad':    'Dystopian Pad.wav',
     'dtop':   'Dystopian topper.wav',
-    'trance': 'Trance Topper.wav',
     'vocal':  'Vocal Topper.wav',
     'kick':   'kick.wav',
     'snare':  'snare.wav',
@@ -40,7 +42,7 @@ FILES = {
 
 # Per-source gain, evening out the bounce levels before anything is combined.
 # kick and vocal came in hot; slam and tambourine came in quiet.
-GAIN = {'pad':1.00, 'dtop':0.85, 'trance':0.70, 'vocal':0.55,
+GAIN = {'pad':1.00, 'dtop':0.85, 'vocal':0.55,
         'kick':0.34, 'snare':0.50, 'slam':0.95, 'tamb':0.75}
 
 # stem -> {source: relative amount}, target LOUDNESS in dB RMS, and a peak cap.
@@ -56,12 +58,13 @@ STEMS = {
     'bed_cold':   ({'pad':1.0, 'dtop':0.35},                         -20.0, 0.42),
     'bed_warm':   ({'pad':1.0, 'dtop':0.75, 'vocal':0.60},           -22.0, 0.42),
     'pulse':      ({'kick':1.0},                                     -27.0, 0.40),
-    'tension':    ({'tamb':1.0, 'trance':0.65},                      -27.0, 0.30),
+    # Trance Topper pulled from both trouble cues — it was the harshest thing in
+    # the score and it fired at exactly the worst moments. Tambourine alone, and
+    # a little quieter: it is pure top end, which reads louder than its level.
+    'tension':    ({'tamb':1.0},                                     -30.0, 0.26),
     'melody':     ({'vocal':1.0, 'dtop':0.40},                       -27.0, 0.30),
-    'hearth':     ({'pad':0.85, 'dtop':1.0, 'vocal':0.35},           -24.0, 0.40),
     'boss_bed':   ({'pad':0.9, 'kick':1.0, 'snare':0.8, 'slam':0.7}, -23.0, 0.46),
-    'boss_press': ({'tamb':0.8, 'trance':1.0, 'snare':0.7,
-                    'slam':0.6},                                     -31.0, 0.30),
+    'boss_press': ({'tamb':1.0, 'snare':0.7, 'slam':0.6},            -31.0, 0.28),
 }
 
 def read(name):
