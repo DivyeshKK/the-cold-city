@@ -662,6 +662,16 @@
   .openSkip{position:absolute;bottom:18px;left:0;right:0;text-align:center;
     font-size:9px;letter-spacing:.22em;text-transform:uppercase;
     color:rgba(255,255,255,.35);z-index:3}
+  /* A real control, separate from the "click to continue" hint below the
+     text — for a player who wants out of the whole cutscene, not just past
+     the current page. Stays live through every page and the gaps between
+     them, since it isn't gated on openAdvance. */
+  .openSkipBtn{position:absolute;bottom:14px;right:16px;z-index:4;
+    font-family:inherit;font-size:9px;letter-spacing:.18em;text-transform:uppercase;
+    color:rgba(255,255,255,.55);background:transparent;
+    border:1px solid rgba(255,255,255,.3);border-radius:2px;
+    padding:7px 13px;cursor:pointer;transition:border-color .15s,color .15s}
+  .openSkipBtn:hover{color:#fff;border-color:rgba(255,255,255,.7)}
 
   /* Phones and short windows: strip the page furniture so the board itself
      keeps as much of the viewport as possible. --chrome drops to match.
@@ -867,6 +877,7 @@
   <div class="opening" id="opening">
     <div class="openLines" id="openLines"></div>
     <div class="openSkip" id="openSkip">Click to continue</div>
+    <button class="openSkipBtn" id="openSkipBtn" type="button">Skip</button>
   </div>
 
   <div class="slotBarWrap" id="slotBarWrap">
@@ -6200,6 +6211,16 @@ document.getElementById('btnRestart').title='Start the run again from the road';
 document.getElementById('btnSkip').onclick=skipDraft;
 window.addEventListener('keydown',ev=>{
   const k=ev.key.toLowerCase();
+  /* The opening runs with titleMode still true — it only flips once the last
+     page hands off to the road — so it has to be checked ahead of that guard
+     below, or every key press here would be silently swallowed the same way
+     the title screen swallows them. Gated on openAdvance exactly like the
+     click handler: a key pressed while a page is still appearing does
+     nothing, so mashing space can't blow through pages before they're read. */
+  if(document.getElementById('opening').classList.contains('show')){
+    if(k===' '||k==='enter'){ ev.preventDefault(); if(openAdvance) openAdvance(); }
+    return;
+  }
   if(titleMode) return;                       // the title screen takes no keys
   if(k==='r'){ restart(); return; }
   if(k==='m'){ SCORE.unlock(); SCORE.setOn(!SCORE.isOn()); return; }   // mute, anywhere
@@ -6332,9 +6353,15 @@ function playOpening(){
     lines.className='openLines';
     lines.innerHTML=OPENING_PAGES[p].map(t=>'<div>'+t+'</div>').join('');
     const kids=[...lines.children];
+    openAdvance=null;                            // deaf until every line has actually landed
     at(60,()=>kids[0].classList.add('in'));      // a tick, so the fade runs
     for(let i=1;i<kids.length;i++) at(60+i*OPEN_LINE_GAP,()=>kids[i].classList.add('in'));
-    openAdvance=()=>endPage(p);
+    // The last line still has its own 1.1s fade (.openLines div's own
+    // transition) to finish after its 'in' class lands — arm the advance
+    // only once that's actually done, or a click/key that lands during the
+    // fade reads the page as "finished" before its last line is visible.
+    const lastLineAt=60+(kids.length-1)*OPEN_LINE_GAP;
+    at(lastLineAt+1100,()=>{ openAdvance=()=>endPage(p); });
   }
   function endPage(p){
     openAdvance=null;                            // deaf until the next page is up
@@ -6355,11 +6382,19 @@ document.getElementById('btnPlay').addEventListener('click',()=>{
   elFader.classList.add('on');
   setTimeout(()=>{ elFader.classList.remove('on'); playOpening(); },760);
 });
-document.getElementById('opening').addEventListener('click',()=>{
+document.getElementById('opening').addEventListener('click',ev=>{
+  if(ev.target.closest('.openSkipBtn')) return;   // that button has its own handler
   /* Only a page that's actually up answers a click. Mid-fade and in the gap
      between pages openAdvance is null and we swallow it, so an impatient
      double-click can't skip a page it never got to read. */
   if(openAdvance) openAdvance();
+});
+/* The real skip: out of the whole cutscene in one step, not just the current
+   page. Doesn't wait on openAdvance — a player reaching for this wants out
+   regardless of whether the current page has finished appearing. */
+document.getElementById('openSkipBtn').addEventListener('click',ev=>{
+  ev.stopPropagation();
+  afterOpening();
 });
 const elTitleCredits=document.getElementById('titleCredits');
 document.getElementById('btnTitleCredits').addEventListener('click',()=>{
