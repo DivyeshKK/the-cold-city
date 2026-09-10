@@ -520,10 +520,10 @@
   button.skip:hover{border-color:var(--cyan);color:#fff}
 
   .bar{display:flex;flex-direction:column;gap:8px;align-items:center;margin-top:12px}
-  /* Stacked by default — .play is transparent to layout and everything falls
+  /* Stacked by default — .playArea is transparent to layout and everything falls
      down the page in source order, exactly as it did before the split. The
      landscape rule further down is the only thing that turns it into a row. */
-  .play{display:block}
+  .playArea{display:block}
   .playSide{display:block}
   /* The four run buttons sit as one block the width of the board, rather than
      drifting to opposite ends of the page — the slot bar above them is the
@@ -722,7 +722,7 @@
     .titlebar{margin-bottom:6px}
     .titlebar h1{font-size:19px;letter-spacing:.18em}
     .bar{margin-top:8px}
-    .play{display:flex;align-items:flex-start;justify-content:center;gap:20px}
+    .playArea{display:flex;align-items:flex-start;justify-content:center;gap:20px}
     /* The board sizes itself with min(100%, ...), and as a bare flex item its
        100% resolved against a column that had shrunk to fit the board — each
        waiting on the other, which bottomed out at a 106px board. Give the
@@ -752,8 +752,8 @@
 
   <!-- Board and controls. Stacked by default; side by side once a landscape
        window is wide enough to seat the controls beside the board (see the
-       .play flex rules). -->
-  <div class="play" id="play">
+       .playArea flex rules). -->
+  <div class="playArea" id="playArea">
   <div class="playMain">
 
   <div class="stageWrap" id="stageWrap">
@@ -940,7 +940,7 @@
     </div>
   </details>
   </div><!-- /.playSide -->
-  </div><!-- /.play -->
+  </div><!-- /.playArea -->
 </div>
 
 <script>
@@ -1625,14 +1625,15 @@ const ENEMY_INFO={
     `<b>Walls:</b> block the blade-hurl's line of sight.`},
   agent180:{order:4,html:
     `<span class="h">Agent 180</span> (boss) — <span class="k">${KINDS.agent180.bd} damage</span> physical, fixed. `+
-    `<b>Normal shot:</b> fires beyond 1 tile with a clear line, then reloads for a turn before it can fire again, same as a Sniper. `+
-    `<b>Telegraph:</b> every 3rd round it lights up the whole of the nearest row with no walls in it, instead of taking a normal shot, and walks onto that row a tile at a time. `+
-    `<b>Fires:</b> the following round — anyone anywhere along that lit row is hit, not just the tile it marked when lighting it; a row with nobody on it does nothing. `+
-    `<b>Avoid it:</b> the moment a row lights up, move off that row (any other row is safe) before its next turn. `+
-    `<b>Moves:</b> otherwise always retreats — 1 tile most turns, 2 tiles every other turn. `+
+    `<b>Only attack:</b> the beam — it has no ordinary shot at all. `+
+    `<b>Telegraph:</b> it sights straight at you — any angle, not just the eight compass directions — and lights every tile the line crosses out to the far wall. `+
+    `<b>Fires:</b> the following round — anyone anywhere on that lit line is hit, wherever they joined it. `+
+    `<b>Avoid it:</b> the moment a line lights up, step off it before the Agent's next turn; one tile sideways is enough. `+
+    `<b>Cadence:</b> half the time it sights the next line in the same breath as firing, so beams land on back-to-back rounds; otherwise it sights on the turn after. A beam lands at least once every two rounds. `+
+    `<b>Cover:</b> the beam goes through obstacles, not around them — but every obstacle it has to cross to reach you <span class="k">halves</span> the damage, so one crate is worth most armour and two make it a graze. A crate caught in the line is left shaking, and a second hit destroys it, so cover here is spent rather than permanent. `+
+    `<b>Moves:</b> retreats up to 2 tiles before every single sighting — it never fires two beams from the same tile. `+
     `<b>Special:</b> any hit that doesn't kill it teleports it elsewhere in the room — the only time it moves without walking. `+
-    `Fought in the dark — while it's alive, your own attack range is capped to the lit 5×5 patch around you. `+
-    `<b>Walls:</b> a walled row can never be the one it lights, but once a row is chosen nothing on it blocks the beam.`},
+    `Fought in the dark — while it's alive, your own attack range is capped to the lit 5×5 patch around you.`},
   lance:{order:5,html:
     `<span class="h">The Lance</span> (boss, final) — magic, fixed defense ${KINDS.lance.def}. `+
     `<b>Damage cap:</b> no single hit you land on it can ever exceed 9, however strong the attack — it has to be worn down, not burst. `+
@@ -2349,6 +2350,9 @@ function loadFloor(i){
   const boxSet=new Set((gen.boxWalls||[]).map(([c,r])=>key(c,r)));
   const boxDeco = F.obstacleDeco==='burn_trash' ? 'burn_trash' : 'box_old';
   S.wallDeco=new Map([...S.walls].map(k=>[k, boxSet.has(k) ? boxDeco : genPick(WALL_SPRITE_POOL)]));
+  // Obstacles the Agent's beam has cracked once. A key in here is drawn
+  // shivering; the next hit takes it off the board (see hitObstacle).
+  S.wallShake=new Set();
   S.shrines=new Set(gen.shrines.map(([c,r])=>key(c,r)));
   S.goal=gen.exit;
   S.exitAnim=null;                               // the unlock cutscene, when it plays
@@ -2996,113 +3000,139 @@ function stepAwayFrom(e,h){
   if(best){ e.col=best[0]; e.row=best[1]; return true; }
   return false;
 }
-/* The Agent's telegraphed shot: it takes a clear row, lights it, and fires
-   down the whole thing the following round. In a dark room where you can
-   only see two tiles, this is the one attack you can see coming — and the
-   lit row is also the only time you're told where it is standing. */
-function agent180Line(e){
-  // fire down its own row if that row is clear of walls; otherwise take the
-  // NEAREST clear one. It has to walk there now, so a random row across the
-  // arena would be a march rather than a reposition.
-  const rowClear=r=>{ for(let c=0;c<COLS;c++) if(isWall(c,r)) return false; return true; };
-  let r = rowClear(e.row) ? e.row : null;
-  if(r===null){
-    let bd=Infinity;
-    for(let rr=0;rr<ROWS;rr++){
-      if(!rowClear(rr)) continue;
-      const d=Math.abs(rr-e.row);
-      if(d<bd){ bd=d; r=rr; }
-    }
-    if(r===null) return false;
+/* The Agent's telegraphed beam: it sights straight at the pilgrim, lights
+   every tile the line crosses from itself out to the far wall, and lets the
+   whole thing go the round after. In a room lit two tiles across this is the
+   one thing you can see coming — and the lit line is also the only time you
+   are told where it is standing.
+   It fires through cover rather than around it: the line marks obstacles too,
+   and they come apart under it (hitObstacle). Cover still pays, though — see
+   beamBlockers: each crate the line has to cross to reach you halves what
+   lands. */
+const BEAM_COVER_CUT=0.5;      // what one crate in the way leaves of the damage
+function agent180Beam(e){
+  const h=S.hero;
+  const dx=h.col-e.col, dy=h.row-e.row;
+  const span=Math.max(Math.abs(dx),Math.abs(dy));
+  if(!span) return false;                      // standing on the pilgrim: no bearing
+  // The line is drawn at the TRUE bearing, not snapped to a compass point.
+  // Dividing by the longer axis makes that axis advance exactly one tile per
+  // step while the other creeps, so rounding walks an unbroken line that
+  // passes dead through the pilgrim's tile at i===span and carries on past
+  // it. A 3-across-1-down shot is its own angle, not a rounded-off diagonal.
+  const sx=dx/span, sy=dy/span;
+  const marks=[];
+  for(let i=1;;i++){                           // its own tile is the muzzle, not a target
+    const c=Math.round(e.col+sx*i), r=Math.round(e.row+sy*i);
+    if(!inB(c,r)) break;
+    marks.push([c,r]);
   }
-  // Stand on the row it is about to rake, so the shot has a visible source.
-  // Hold its column if that tile is free, so the walk is the short way there.
-  let tc=e.col;
-  if(isWall(tc,r)||occupied(tc,r,e)){
-    let bd=Infinity;
-    for(let c=0;c<COLS;c++){
-      if(isWall(c,r)||occupied(c,r,e)) continue;
-      const d=Math.abs(c-e.col);
-      if(d<bd){ bd=d; tc=c; }
-    }
-    if(bd===Infinity) return false;
-  }
-  agent180WalkTo(e,tc,r);
-  e.marks=[]; for(let c=0;c<COLS;c++) if(!isWall(c,r)) e.marks.push([c,r]);
-  e.lineRow=r; e.phase='fire';
-  say('agent 180 lights a lane. get off that row.');
+  if(!marks.length) return false;              // already against the wall it faces
+  e.marks=marks; e.phase='fire';
+  say('agent 180 sights a line. get out of it.');
   return true;
 }
-/* Walks it into the firing position a tile at a time rather than dropping it
-   there. In a room lit two tiles wide the steps are mostly sound and ripples
-   on the floor, which is the point: it is somewhere, and it is coming. Only a
-   landed hit still throws it across the arena — see agent180Teleport. */
-function agent180WalkTo(e,tc,tr){
-  const path=[];
-  let c=e.col, r=e.row, guard=0;
-  while((c!==tc||r!==tr) && guard++<60){
-    const dc=Math.sign(tc-c), dr=Math.sign(tr-r);
-    // close the longer axis first, and fall back to the other when blocked
-    const tries = Math.abs(tc-c)>=Math.abs(tr-r) ? [[dc,0],[0,dr]] : [[0,dr],[dc,0]];
-    let moved=false;
-    for(const [mc,mr] of tries){
-      if(!mc&&!mr) continue;
-      if(!passable(c+mc,r+mr,e)) continue;
-      c+=mc; r+=mr; path.push([c,r]); moved=true; break;
-    }
-    if(!moved) break;                          // walled in — fire from where it stands
+/* How much cover the line has to cross to reach you: every obstacle standing
+   between the muzzle and your tile, counted at the moment it fires and before
+   the beam wrecks any of them. Each one halves the damage, so a single crate
+   is worth as much as most armour and two make the shot a graze. Cover on the
+   far side of you does nothing — it is the crossing that costs the beam. */
+function beamBlockers(e,marks){
+  const h=S.hero;
+  let n=0;
+  for(const [c,r] of marks){
+    if(c===h.col && r===h.row) break;          // reached you: stop counting
+    if(S.walls.has(key(c,r))) n++;
   }
-  if(!path.length) return;
-  let i=0;
-  (function step(){
-    if(S.over||!e.alive) return;
-    const [nc,nr]=path[i++];
-    addFx({type:'ring',col:e.col,row:e.row,col2:'rgba(63,224,122,.45)',dur:240});
-    e.col=nc; e.row=nr;                        // vx/vy left alone, so it glides
-    if(i<path.length) setTimeout(step,130);
-  })();
+  return n;
+}
+/* One tile of cover taking a hit from the beam. Twice kills it: the first
+   leaves it shivering as a warning that it will not survive the next, the
+   second takes it off the board. Two hits rather than one so a player who
+   reads the line can still spend a round behind a crate. */
+function hitObstacle(k){
+  const [c,r]=k.split(',').map(Number);
+  if(!S.wallShake) S.wallShake=new Set();
+  if(!S.wallShake.has(k)){
+    S.wallShake.add(k);                        // cracked — drawn shivering from here
+    addFx({type:'ring',col:c,row:r,col2:'rgba(63,224,122,.8)',dur:380});
+    return;
+  }
+  S.wallShake.delete(k);
+  S.walls.delete(k); if(S.wallDeco) S.wallDeco.delete(k);
+  addFx({type:'tileflash',col:c,row:r,dur:260});
+}
+/* Two steps of ground given up, ringed at both ends. It never sights from
+   where it last fired — in a room you can only see two tiles across, a beam
+   that came from the same muzzle twice would be a line you could pre-empt
+   instead of read. */
+function agent180Reposition(e,h){
+  const from=[e.col,e.row];
+  for(let i=0;i<2;i++){ if(!stepAwayFrom(e,h)) break; }
+  if(from[0]===e.col && from[1]===e.row){
+    // Backed into a corner, so there is no tile further from you to take —
+    // but standing still would let it fire a second beam down the same line
+    // from the same muzzle, which is a shot you could pre-empt rather than
+    // read. Take the best sidestep on offer instead, even a lateral one.
+    let best=null, bd=-1;
+    for(const [dc,dr] of N4){
+      const nc=e.col+dc, nr=e.row+dr;
+      if(!passable(nc,nr,e)) continue;
+      const d=Math.max(Math.abs(nc-h.col),Math.abs(nr-h.row));
+      if(d>bd){ bd=d; best=[nc,nr]; }
+    }
+    if(best){ e.col=best[0]; e.row=best[1]; }
+  }
+  if(from[0]===e.col && from[1]===e.row) return false;   // truly walled in
+  // A silent reposition in the dark reads as the thing teleporting at random.
+  // Ring the ground it left and the ground it took, so the move is legible
+  // even when the body isn't. It walks the gap — only a landed hit throws it.
+  addFx({type:'ring',col:from[0],row:from[1],col2:'rgba(63,224,122,.75)',dur:420});
+  addFx({type:'ring',col:e.col,   row:e.row,   col2:'rgba(63,224,122,.9)', dur:420});
+  return true;
 }
 function agent180Act(e){
   const h=S.hero;
-  // the lane it lit last round goes off now, whatever is standing in it
+  // the line it lit last round goes off now, through whatever is standing in it
   if(e.phase==='fire'){
     const hits=e.marks||[];
-    for(const [c,r] of hits)
+    let hitYou=false;
+    for(const [c,r] of hits){
       addFx({type:'ring',col:c,row:r,col2:'rgba(63,224,122,.9)',dur:460});
+      if(c===h.col && r===h.row) hitYou=true;
+    }
     e.anim={t:performance.now(),kind:'shoot',dir:h.col>=e.col?1:-1};
-    if(h.row===e.lineRow){
-      say('the lane goes off, and you are still in it.');
+    // Count cover BEFORE the beam wrecks it — the crates that were standing
+    // when it fired are the ones that soaked the shot.
+    const blocked=hitYou ? beamBlockers(e,hits) : 0;
+    // cover goes after the ring fx are queued, so a crate is seen to be struck
+    for(const [c,r] of hits){ const k=key(c,r); if(S.walls.has(k)) hitObstacle(k); }
+    if(hitYou){
+      // Each crossing halves it, never below 1 — the same floor every other
+      // blow in the game has, so cover softens the beam without voiding it.
+      const dmg=Math.max(1, Math.round(enemyHit(e)*Math.pow(BEAM_COVER_CUT,blocked)));
+      say(blocked
+        ? `the line goes off — ${blocked===1?'a crate':'the cover'} takes the worst of it.`
+        : 'the line goes off, and you are still in it.');
       noteTrouble('sniped');
-      hurtHero(enemyHit(e),'shot','physical',e);
-    } else say('the lane burns empty air.');
-    e.marks=[]; e.phase=null; e.spent=true;    // and it needs the next round to reload
+      hurtHero(dmg,'beam','physical',e);
+    } else say('the line burns empty air.');
+    e.marks=[]; e.phase=null;
+    // Half the time it sights the next line in the same breath as firing this
+    // one, so the beams land on back-to-back rounds. The other half it spends
+    // the next turn sighting instead. Sighting always happens on the turn
+    // after a shot at the latest, so the floor is a beam every two rounds and
+    // the coin decides whether you get even that long.
+    // It repositions first either way: no two beams are ever fired from the
+    // same tile.
+    if(Math.random()<0.5){ agent180Reposition(e,h); agent180Beam(e); }
     return;
   }
-  e.moveTick=(e.moveTick||0)+1;
-  // every third round it stops strafing and lines one up instead
-  if(e.moveTick%3===0 && agent180Line(e)) return;
-  const steps = e.moveTick%2===0 ? 2 : 1;      // the "big move" round: two steps away
-  const from=[e.col,e.row];
-  for(let i=0;i<steps;i++){ if(!stepAwayFrom(e,h)) break; }
-  // In a room you can only see two tiles across, a silent reposition reads as
-  // the thing teleporting at random. Ring the ground it left and the ground
-  // it took, so the move is legible even when the body isn't. It walks the
-  // gap, though — only a landed hit throws it (agent180Teleport).
-  if(from[0]!==e.col||from[1]!==e.row){
-    addFx({type:'ring',col:from[0],row:from[1],col2:'rgba(63,224,122,.75)',dur:420});
-    addFx({type:'ring',col:e.col,   row:e.row,   col2:'rgba(63,224,122,.9)', dur:420});
-  }
-  if(cheb(e,h)>1 && losClear(e,h)){
-    if(e.spent){ e.spent=false; return; }       // reloading — your window to close
-    if(S.hero.buffs.lightning){ say('lightning turns the shot aside.'); return; }
-    e.anim={t:performance.now(),kind:'shoot',dir:h.col>=e.col?1:-1};
-    addFx({type:'sprshot',from:{c:e.col,r:e.row},to:{c:h.col,r:h.row},
-           key:'sniper_shot',hit:'sniper_hit',dur:420});
-    say('agent 180 fires out of the dark.');
-    e.spent=true;
-    noteTrouble('sniped');
-    hurtHero(enemyHit(e),'shot','physical',e);
-  }
+  // Not sighting yet: give ground first, then line the next one up. Movement
+  // is free — it is the shot that costs a turn, not the walk.
+  agent180Reposition(e,h);
+  // If it somehow cannot sight (standing on the pilgrim), the walk was the turn.
+  agent180Beam(e);
 }
 /* ---- The Lance -----------------------------------------------------------
    A three-beat cycle you can read and plan around:
@@ -4461,6 +4491,13 @@ function win(){
    board turned portrait (it was 12x6 landscape before that); every build
    since is 2.x. Each entry is [number, date, [lines]] — add to the top. */
 const VERSIONS=[
+  ['2.11.0','9 Sep 2026',[
+    'Agent 180 fights with one weapon now: it sights a line straight at you and lets it go the round after',
+    'The line comes at whatever angle you are standing at, not just the eight compass directions',
+    'It has no ordinary shot any more, and it never fires two beams from the same tile',
+    'The beam goes through cover \u2014 but every obstacle between it and you halves the damage',
+    'An obstacle caught in the line is left shaking, and a second hit destroys it',
+  ]],
   ['2.10.0','14 Aug 2026',[
     'The game has music — seven layers on one clock, fading in and out with what is happening rather than a track that just plays',
     'Percussion means trouble: a kick when the city takes its turn, more when you are hurt or cornered, the whole kit for a boss',
@@ -5454,6 +5491,14 @@ function drawBoard(now){
   for(const k of S.walls){
     const [c,r]=k.split(',').map(Number);
     const deco=(S.wallDeco&&S.wallDeco.get(k))||'wall_tape1';
+    // Cracked by the Agent's beam and not yet finished off: a small, fast
+    // side-to-side shiver. Offset per tile so a row of them doesn't sway in
+    // lockstep, which reads as the floor moving rather than the crates.
+    const shaking=S.wallShake&&S.wallShake.has(k);
+    if(shaking){
+      ctx.save();
+      ctx.translate(Math.sin(now/45+c*2.1+r*1.3)*1.4,0);
+    }
     if(deco==='box_old'){
       const x=tileX(c),y=tileY(r);
       ctx.fillStyle=PAL.wallFront; ctx.fillRect(x+1,y+1,TILE-2,TILE-2);
@@ -5469,6 +5514,7 @@ function drawBoard(now){
     } else {
       drawSprite(deco,cx(c),tileY(r)+TILE-2,false,OBST_SCALE);
     }
+    if(shaking) ctx.restore();
   }
   // mage reticle
   if(S.phase==='player'&&!S.over&&S.enemies.some(e=>e.alive&&e.ai==='shell')){
@@ -5863,6 +5909,12 @@ function drawFx(now){
         ctx.fillRect(fx+(tx-fx)*q-1.5,fy+(ty-fy)*q-1.5,3,3);
       }
       ctx.globalAlpha=1;
+    } else if(e.type==='tileflash'){
+      // one obstacle going out: the tile blows white, then nothing
+      ctx.globalAlpha=Math.max(0,1-p*p);
+      ctx.fillStyle='#ffffff';
+      ctx.fillRect(tileX(e.col)+1,tileY(e.row)+1,TILE-2,TILE-2);
+      ctx.globalAlpha=1;
     } else if(e.type==='ring'){
       ctx.strokeStyle=e.col2; ctx.globalAlpha=1-p; ctx.lineWidth=1.5;
       ctx.beginPath(); ctx.arc(cx(e.col),cyr(e.row),4+p*12,0,7); ctx.stroke(); ctx.globalAlpha=1;
@@ -6050,6 +6102,19 @@ function drawAgentLane(now){
     // the muzzle it will come from, so the lane has a source you can read
     ctx.fillStyle=`rgba(180,255,210,${(0.5+0.4*Math.sin(now/70)).toFixed(2)})`;
     ctx.beginPath(); ctx.arc(cx(e.col),cyr(e.row),TILE*0.22,0,7); ctx.fill();
+  }
+  // Cover going out under the beam, drawn again on top of the dark for the
+  // same reason the lane is: drawFx runs before drawFog, so down in the
+  // unlit part of the room the white flash was being swallowed by the very
+  // thing it is supposed to burn through.
+  for(const f of effects){
+    if(f.type!=='tileflash') continue;
+    const p=(now-f.t0)/f.dur;
+    if(p<0||p>1) continue;
+    ctx.globalAlpha=Math.max(0,1-p*p);
+    ctx.fillStyle='#ffffff';
+    ctx.fillRect(tileX(f.col)+1,tileY(f.row)+1,TILE-2,TILE-2);
+    ctx.globalAlpha=1;
   }
 }
 /* The soft pulsing ring alone — no dimming. Shared by the darkened case
