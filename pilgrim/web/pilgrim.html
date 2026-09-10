@@ -1621,6 +1621,8 @@ const ENEMY_INFO={
     `<b>Range:</b> melee at adjacent tiles; beyond 3 tiles with a clear line it hurls its blade for the same damage instead — `+
     `one throw, then it must close the distance again before it can throw a second time. `+
     `<b>Moves:</b> closes 2 tiles a turn — faster than a Goon, so backing away alone doesn't hold it off. `+
+    `<b>Charge:</b> every 3-4 rounds it stops chasing and paints a red lane straight at you — any angle — then runs the lane down on its next turn for <span class="k">half again</span> its usual damage. `+
+    `<b>Avoid it:</b> step off the red before its next turn, or put an obstacle between you: unlike Agent 180's beam, the lane STOPS at the first obstacle, so the right crate means the charge cannot reach you at all. `+
     `<b>Special:</b> defense ${KINDS.warden.def}, the heaviest armor in the game — magic and multi-hit attacks cut through it far better than plain strikes. `+
     `<b>Walls:</b> block the blade-hurl's line of sight.`},
   agent180:{order:4,html:
@@ -2642,6 +2644,7 @@ function advance(){
         else if(e.ai==='shell') mortarAct(e);
         else if(e.ai==='lance') lanceAct(e);
         else if(e.ai==='agent180') agent180Act(e);
+        else if(e.kind==='warden') wardenAct(e);
         else goonAct(e);
       }
       if(S.over){ S.resolving=false; return; }
@@ -2952,6 +2955,75 @@ function goonAct(e){
     e.col=c; e.row=r;
     if(cheb(e,h)<=(e.range||1)) break;           // stop once in reach
   }
+}
+/* ---- The Warden's charge ---------------------------------------------------
+   Every few rounds it stops chasing, sets itself, and paints a red lane
+   straight at the pilgrim; the round after, it runs the lane down.
+   The lane is drawn at the true bearing, the same way the Agent's beam is —
+   but where the beam crosses cover and charges you a toll for it, this one
+   STOPS at the first obstacle. That is the whole difference between the two
+   bosses: against the Agent a crate buys you a smaller hit, against the
+   Warden the right crate means the charge cannot reach you at all. */
+const WARDEN_CHARGE_AMP=1.5;                 // what running you down multiplies its blow by
+const WARDEN_CHARGE_MIN=3, WARDEN_CHARGE_MAX=4;   // rounds between charges
+const wardenChargeGap=()=>
+  WARDEN_CHARGE_MIN+Math.floor(Math.random()*(WARDEN_CHARGE_MAX-WARDEN_CHARGE_MIN+1));
+function wardenLine(e){
+  const h=S.hero;
+  const dx=h.col-e.col, dy=h.row-e.row;
+  const span=Math.max(Math.abs(dx),Math.abs(dy));
+  if(!span) return false;                    // standing on the pilgrim: no bearing
+  const sx=dx/span, sy=dy/span;              // longer axis steps 1, the other creeps
+  const marks=[];
+  for(let i=1;;i++){
+    const c=Math.round(e.col+sx*i), r=Math.round(e.row+sy*i);
+    if(!inB(c,r)) break;
+    if(isWall(c,r)) break;                   // cover stops the charge dead
+    marks.push([c,r]);
+  }
+  // Even a one-tile lane counts: pressed up against you the charge becomes a
+  // telegraphed heavy swing you can still step out of. Requiring two tiles
+  // (an earlier version did) meant that in a room this small the Warden
+  // closed to melee once and then never charged again, which is not the
+  // every-3-to-4-rounds threat it is meant to be.
+  if(!marks.length) return false;            // nose against a wall: nothing to run down
+  e.marks=marks; e.phase='charge';
+  say('the warden sets itself. get off the red.');
+  return true;
+}
+function wardenCharge(e){
+  const h=S.hero, lane=e.marks||[];
+  e.marks=[]; e.phase=null;
+  let land=null, hit=false;
+  for(const [c,r] of lane){
+    addFx({type:'ring',col:c,row:r,col2:'rgba(255,80,90,.9)',dur:420});
+    if(c===h.col && r===h.row){ hit=true; break; }   // it runs into you and stops there
+    if(occupied(c,r,e)) break;                        // another body in the lane
+    land=[c,r];
+  }
+  // The lane is a straight line, so simply landing it on the far tile and
+  // letting vx/vy ease across draws the run itself — no stepped walk needed.
+  if(land){ e.col=land[0]; e.row=land[1]; }
+  e.anim={t:performance.now(),kind:'melee',dir:h.col>=e.col?1:-1};
+  shake(hit?7:4);
+  if(hit){
+    say('the warden comes down the lane and runs you over.');
+    noteTrouble('charged');
+    hurtHero(Math.max(1,Math.round(enemyHit(e)*WARDEN_CHARGE_AMP)),'charge','physical',e);
+  } else say('the warden barrels past.');
+}
+function wardenAct(e){
+  if(e.chargeIn===undefined) e.chargeIn=wardenChargeGap();
+  // Every round counts against the gap, the round it spends charging
+  // included — otherwise the charge turn is free and the real interval comes
+  // out one longer than the number says.
+  e.chargeIn--;
+  if(e.phase==='charge'){ wardenCharge(e); return; }
+  // A refused lane (nose to a wall, or too short to be a charge) leaves the
+  // counter spent, so it tries again next turn rather than waiting out
+  // another full gap.
+  if(e.chargeIn<=0 && wardenLine(e)){ e.chargeIn=wardenChargeGap(); return; }
+  goonAct(e);                                // otherwise it closes as it always did
 }
 /* The archer obeys the same economy you do: it either repositions OR fires,
    never both. Crowd it and it gives ground without shooting — that retreat is
@@ -4491,6 +4563,11 @@ function win(){
    board turned portrait (it was 12x6 landscape before that); every build
    since is 2.x. Each entry is [number, date, [lines]] — add to the top. */
 const VERSIONS=[
+  ['2.12.0','10 Sep 2026',[
+    'The Warden has a charge: every 3-4 rounds it sets itself and paints a red lane straight at you',
+    'The round after, it runs the lane down for half again its usual damage',
+    'The lane comes at whatever angle you are standing at, and it stops at the first obstacle \u2014 put a crate between you and the charge cannot reach you at all',
+  ]],
   ['2.11.0','9 Sep 2026',[
     'Agent 180 fights with one weapon now: it sights a line straight at you and lets it go the round after',
     'The line comes at whatever angle you are standing at, not just the eight compass directions',
@@ -5449,7 +5526,7 @@ function drawBoard(now){
   // painted ground: the lance's field and the mortar's single shell alike
   for(const e of S.enemies){
     if(!e.alive||!e.marks||!e.marks.length) continue;
-    const charging = e.phase==='fire';               // about to go off
+    const charging = e.phase==='fire' || e.phase==='charge';   // about to go off
     const b = charging ? (.45+.45*Math.sin(now/90)) : (.22+.18*Math.sin(now/260));
     for(const [c,r] of e.marks){
       ctx.fillStyle=`rgba(255,60,80,${(b*0.5).toFixed(2)})`;
